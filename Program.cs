@@ -22,9 +22,7 @@ namespace PudgeClient
             Console.WriteLine("needed: {0}, self: {1}", angle, data.SelfLocation.Angle);
             var rAngle = (angle - data.SelfLocation.Angle) % 360;
             if (Math.Abs(rAngle) > 180)
-                if (Math.Sign(rAngle) > 0)
-                    rAngle -= 360;
-                else rAngle += 360;
+                rAngle += -Math.Sign(rAngle) * 360;
             Console.WriteLine("!!" + rAngle);
             client.Rotate(rAngle);
             return client.Move(Math.Sqrt(dx * dx + dy * dy));
