@@ -10,6 +10,26 @@ namespace PudgeClient
 
         // Пример визуального отображения данных с сенсоров при отладке.
         // Если какая-то информация кажется вам лишней, можете закомментировать что-нибудь.
+        static PudgeSensorsData MoveTo(PudgeClientLevel1 client, PudgeSensorsData data, double x, double y)
+        {
+            client.Wait(0.5);
+            Console.WriteLine("current: X - {0},    Y - {1}", data.SelfLocation.X, data.SelfLocation.Y);
+            var dx = x - data.SelfLocation.X;
+            var dy = y - data.SelfLocation.Y;
+            if (data.SelfLocation.Angle < 0) data.SelfLocation.Angle += 360;
+            Console.WriteLine("DX: {0}, DY: {1}", dx, dy);
+            var angle = Math.Atan2(dy, dx) * 180 / Math.PI;
+            Console.WriteLine("needed: {0}, self: {1}", angle, data.SelfLocation.Angle);
+            var rAngle = (angle - data.SelfLocation.Angle) % 360;
+            if (Math.Abs(rAngle) > 180)
+                if (Math.Sign(rAngle) > 0)
+                    rAngle -= 360;
+                else rAngle += 360;
+            Console.WriteLine("!!" + rAngle);
+            client.Rotate(rAngle);
+            return client.Move(Math.Sqrt(dx * dx + dy * dy));
+        }
+
         static void Print(PudgeSensorsData data)
         {
             Console.WriteLine("---------------------------------");
@@ -53,37 +73,48 @@ namespace PudgeClient
             var sensorData = client.Configurate(ip, port, CvarcTag);
 
             // Каждое действие возвращает данные с сенсоров.
-            sensorData = client.Move();
             Print(sensorData);
+            sensorData = MoveTo(client, sensorData, 0, -123);
+            sensorData = MoveTo(client, sensorData, 0, 0);
+            sensorData = MoveTo(client, sensorData, 0, 70);
+            sensorData = MoveTo(client, sensorData, -48, 38);
+            sensorData = MoveTo(client, sensorData, -83, 0);
+            sensorData = MoveTo(client, sensorData, -146, 0);
+            sensorData = MoveTo(client, sensorData, -120, -70);
 
+
+            Console.WriteLine(Math.Atan2(1, 0) + " " +  Math.Atan2(0, 1));
             // Для удобства, можно подписать свой метод на обработку всех входящих данных с сенсоров.
             // С этого момента любое действие приведет к отображению в консоли всех данных
             client.SensorDataReceived += Print;
-
+            
             // Угол поворота указывается в градусах, против часовой стрелки.
             // Для поворота по часовой стрелке используйте отрицательные значения.
-            client.Rotate(-45);
+            //client.Rotate(-45);
 
-            client.Move(60);
-            client.Wait(0.1);
+            //client.Move(60);
+            //client.Wait(0.1);
 
-            // Так можно хукать, но на первом уровне эта команда будет игнорироваться.
-            client.Hook();
+            //// Так можно хукать, но на первом уровне эта команда будет игнорироваться.
+            //client.Hook();
+            //client.Rotate(-170);
+            //client.Move();
+            //client.Wait(4);
+            //client.Rotate(351);
+            //client.Move();
+            //for (int i = 0; i < 10; i++)
+            //{
+            //    if (i == 1) client.Rotate(90);
+            //    client.Move(50);
+            //}
 
-            client.Wait(4);
-            for (int i = 0; i < 10; i++)
-            {
-                if (i == 1) client.Rotate(90);
-                client.Move(50);
-            }
-
-            // Пример длинного движения. Move(100) лучше не писать. Мало ли что произойдет за это время ;) 
-            for (int i = 0; i < 50; i++)
-            {
-                client.Move(3);
-            }
-            client.Wait(5);
-            // Корректно завершаем работу
+            //// Пример длинного движения. Move(100) лучше не писать. Мало ли что произойдет за это время ;) 
+            //for (int i = 0; i < 50; i++)
+            //{
+            //    client.Move(3);
+            //}
+            //client.Wait(5);
+            //// Корректно завершаем работу
             client.Exit();
         }
     }
