@@ -1,6 +1,7 @@
 ﻿using System;
 using Pudge;
 using Pudge.Player;
+using AIRLab.Mathematics;
 
 namespace PudgeClient
 {
@@ -16,13 +17,12 @@ namespace PudgeClient
             Console.WriteLine("current: X - {0},    Y - {1}", data.SelfLocation.X, data.SelfLocation.Y);
             var dx = x - data.SelfLocation.X;
             var dy = y - data.SelfLocation.Y;
-            if (data.SelfLocation.Angle < 0) data.SelfLocation.Angle += 360;
             Console.WriteLine("DX: {0}, DY: {1}", dx, dy);
             var angle = Math.Atan2(dy, dx) * 180 / Math.PI;
             Console.WriteLine("needed: {0}, self: {1}", angle, data.SelfLocation.Angle);
             var rAngle = (angle - data.SelfLocation.Angle) % 360;
             if (Math.Abs(rAngle) > 180)
-                rAngle += -Math.Sign(rAngle) * 360;
+                rAngle -= Math.Sign(rAngle) * 360;
             Console.WriteLine("!!" + rAngle);
             client.Rotate(rAngle);
             return client.Move(Math.Sqrt(dx * dx + dy * dy));
@@ -54,12 +54,35 @@ namespace PudgeClient
         static void Main(string[] args)
         {
             if (args.Length == 0)
-                args = new[] {"127.0.0.1", "14000"};
+                args = new[] { "127.0.0.1", "14000" };
             var ip = args[0];
             var port = int.Parse(args[1]);
 
             // Каждую неделю клиент будет новый. Соотетственно Level1, Level2 и Level3.
             var client = new PudgeClientLevel1();
+
+            var points = new Point2D[]
+            {
+                new Point2D(-123, -123),
+                new Point2D(-70, -120),
+                new Point2D(0, -123),
+                new Point2D(0, -90),
+                new Point2D(-48, 38),
+                new Point2D(0, 0),
+                new Point2D(48, 38)
+            };
+
+            var graph = new Graph(points);
+            graph.MakeBounds(
+                0, 1,
+                1, 2,
+                2, 3,
+                3, 4,
+                4, 5,
+                4, 6,
+                5, 6,
+                3, 5,
+                3, 6);
 
             // У этого метода так же есть необязательные аргументы:
             // timeLimit -- время в секундах, сколько будет идти матч (по умолчанию 90)
@@ -71,8 +94,12 @@ namespace PudgeClient
             var sensorData = client.Configurate(ip, port, CvarcTag);
 
             // Каждое действие возвращает данные с сенсоров.
-            Print(sensorData);
             sensorData = MoveTo(client, sensorData, 0, -123);
+            Print(sensorData);
+
+            // Для удобства, можно подписать свой метод на обработку всех входящих данных с сенсоров.
+            // С этого момента любое действие приведет к отображению в консоли всех данных
+            client.SensorDataReceived += Print;
             sensorData = MoveTo(client, sensorData, 0, 0);
             sensorData = MoveTo(client, sensorData, 0, 70);
             sensorData = MoveTo(client, sensorData, -48, 38);
@@ -81,11 +108,6 @@ namespace PudgeClient
             sensorData = MoveTo(client, sensorData, -120, -70);
 
 
-            Console.WriteLine(Math.Atan2(1, 0) + " " +  Math.Atan2(0, 1));
-            // Для удобства, можно подписать свой метод на обработку всех входящих данных с сенсоров.
-            // С этого момента любое действие приведет к отображению в консоли всех данных
-            client.SensorDataReceived += Print;
-            
             // Угол поворота указывается в градусах, против часовой стрелки.
             // Для поворота по часовой стрелке используйте отрицательные значения.
             //client.Rotate(-45);
