@@ -40,9 +40,17 @@ namespace PudgeClient
             new Point2D(120, 70)
         };
 
+        public static Point2D[] SpecRunes = new Point2D[]
+        {
+            new Point2D(-130, 130),
+            new Point2D(130, -130)
+        };
+
+        public static HashSet<Rune> Visited = new HashSet<Rune>();
+
         // Пример визуального отображения данных с сенсоров при отладке.
         // Если какая-то информация кажется вам лишней, можете закомментировать что-нибудь.
-        
+
         static void Print(PudgeSensorsData data)
         {
             Console.WriteLine("---------------------------------");
@@ -81,27 +89,30 @@ namespace PudgeClient
 
             var points = new Point2D[]
             {
-                new Point2D(-130, -130),
-                new Point2D(-70, -120),
-                new Point2D(0, -123),
-                new Point2D(0, -70),
-                new Point2D(-55, -28),
-                new Point2D(55, -28),
-                new Point2D(0, 0),
-                new Point2D(-83, 0),
-                new Point2D(-146, 0),
-                new Point2D(83, 0),
-                new Point2D(146, 0),
-                new Point2D(-120, -70),
-                new Point2D(120, 70),
-                new Point2D(-48, 38),
-                new Point2D(48, 38),
-                new Point2D(0, 70),
-                new Point2D(0, 123),
-                new Point2D(70, 120),
-                new Point2D(130, 130)
-
-            };
+                new Point2D(-130, -130),        //0
+                new Point2D(-70, -120),         //1
+                new Point2D(0, -123),           //2
+                new Point2D(0, -70),            //3
+                new Point2D(-55, -28),          //4
+                new Point2D(55, -28),           //5
+                new Point2D(0, 0),              //6
+                new Point2D(-83, 0),            //7
+                new Point2D(-146, 0),           //8
+                new Point2D(83, 0),             //9
+                new Point2D(146, 0),            //10
+                new Point2D(-120, -70),         //11
+                new Point2D(120, 70),           //12
+                new Point2D(-48, 38),           //13
+                new Point2D(48, 38),            //14
+                new Point2D(0, 70),             //15
+                new Point2D(0, 123),            //16
+                new Point2D(70, 120),           //17
+                new Point2D(130, 130),          //18
+                new Point2D(85, -80),           //19
+                new Point2D(130, -130),         //20
+                new Point2D(-100, 85),          //21
+                new Point2D(-130, 130)          //22
+            };  
 
             var graph = new Graph(points);
             graph = graph.MakeBounds(
@@ -131,33 +142,43 @@ namespace PudgeClient
                 16, 17,
                 17, 18,
                 12, 18,
-                0, 11
+                0, 11,
+                19, 20,
+                21, 22,
+                2, 19,
+                10, 19,
+                8, 21,
+                16, 21
                 );
 
             //client.SensorDataReceived += Print;
-            var visited = new HashSet<Rune>();
             while(true)
             {
-                var toGo = new List<DijkstraAnswer>();
-                foreach (var rune in Runes)
-                {
-                    if (visited.Select(x => x.Location).Contains(rune))
-                        continue;
-                    var loc = sensorData.SelfLocation;
-                    var start = graph.Nodes.Where(x => Math.Abs(x.Location.X - loc.X) < 1.5 && Math.Abs(x.Location.Y - loc.Y) < 1.5).Single();
-                    var finish = graph.Nodes.Where(x => x.Location == rune).Single();
-                    toGo.Add(DijkstraAlgo.Dijkstra(graph, start, finish));
-                }
-                if (toGo.Count == 0) break;
-                var min = toGo.Select(x => x.PathLength).Min();
-                var choice = toGo.Where(x => x.PathLength == min).Select(x => x.Path).First().Skip(1);
+                //var toGo = new List<DijkstraAnswer>();
+                //foreach (var rune in Runes)
+                //{
+                //    if (visited.Select(x => x.Location).Contains(rune))
+                //        continue;
+                //    var loc = sensorData.SelfLocation;
+                //    var start = graph.Nodes.Where(x => Math.Abs(x.Location.X - loc.X) < 1.5 && Math.Abs(x.Location.Y - loc.Y) < 1.5).Single();
+                //    var finish = graph.Nodes.Where(x => x.Location == rune).Single();
+                //    toGo.Add(DijkstraAlgo.Dijkstra(graph, start, finish));
+                //}
+                //if (toGo.Count == 0) break;
+                //var min = toGo.Select(x => x.PathLength).Min();
+                IEnumerable<Node> choice;
+                if (sensorData.Events.Select(x => x.Event).Contains(Pudge.World.PudgeEvent.Invisible))
+                    choice = InvestigateWorld(sensorData, graph, SpecRunes);
+                else choice = InvestigateWorld(sensorData, graph, Runes);
+                if (choice.Count() == 0) break;
                 foreach (var node in choice)
                     sensorData = client.MoveTo(sensorData, node.Location.X, node.Location.Y);
-                visited.Add(
+                Visited.Add(
                     new Rune(choice.Last().Location, 25)
                         );
                 //visited.RemoveWhere(x => x.ToDelete);
             }
+
             //sensorData = MoveTo(client, sensorData, 0, 0);
             //sensorData = MoveTo(client, sensorData, 0, 70);
             //sensorData = MoveTo(client, sensorData, -48, 38);
@@ -167,6 +188,24 @@ namespace PudgeClient
 
             // Корректно завершаем работу
             client.Exit();
+        }
+
+        public static IEnumerable<Node> InvestigateWorld(PudgeSensorsData data, Graph graph, Point2D[] runes)
+        {
+            var toGo = new List<DijkstraAnswer>();
+            foreach (var rune in runes)
+            {
+                if (Visited.Select(x => x.Location).Contains(rune))
+                    continue;
+                var loc = data.SelfLocation;
+                var start = graph.Nodes.Where(x => Math.Abs(x.Location.X - loc.X) < 1.5 && Math.Abs(x.Location.Y - loc.Y) < 1.5).Single();
+                var finish = graph.Nodes.Where(x => x.Location == rune).Single();
+                toGo.Add(DijkstraAlgo.Dijkstra(graph, start, finish));
+            }
+            if (toGo.Count == 0) return new List<Node>();
+            var min = toGo.Select(x => x.PathLength).Min();
+            var choice = toGo.Where(x => x.PathLength == min).Select(x => x.Path).First().Skip(1);
+            return choice;
         }
     }
 }
