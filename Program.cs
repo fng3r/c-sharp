@@ -84,9 +84,9 @@ namespace PudgeClient
                 new Point2D(-130, -130),
                 new Point2D(-70, -120),
                 new Point2D(0, -123),
-                new Point2D(0, -90),
-                new Point2D(-48, -38),
-                new Point2D(48, -38),
+                new Point2D(0, -70),
+                new Point2D(-55, -28),
+                new Point2D(55, -28),
                 new Point2D(0, 0),
                 new Point2D(-83, 0),
                 new Point2D(-146, 0),
@@ -98,8 +98,8 @@ namespace PudgeClient
                 new Point2D(48, 38),
                 new Point2D(0, 70),
                 new Point2D(0, 123),
-                new Point2D(70, 120)
-
+                new Point2D(70, 120),
+                new Point2D(130, 130)
 
             };
 
@@ -122,12 +122,16 @@ namespace PudgeClient
                 10, 12,
                 6, 13,
                 6, 14,
+                6, 15,
                 7, 13,
                 9, 14,
                 13, 15,
                 14, 15,
                 15, 16,
-                16, 17
+                16, 17,
+                17, 18,
+                12, 18,
+                0, 11
                 );
 
             //client.SensorDataReceived += Print;
