@@ -1,6 +1,7 @@
 ﻿using System;
 using Pudge;
 using Pudge.Player;
+using Pudge.World;
 using AIRLab.Mathematics;
 using System.Collections.Generic;
 using System.Linq;
@@ -26,7 +27,7 @@ namespace PudgeClient
             new Point2D(130, -130)
         };
 
-        public static HashSet<Point2D> Visited = new HashSet<Point2D>();
+        public static RuneHashSet Visited = new RuneHashSet();
 
         static void Print(PudgeSensorsData data)
         {
@@ -152,123 +153,68 @@ namespace PudgeClient
 
             while (true)
             {
-                Visited = checkRunesList(Visited, sensorData.WorldTime);
-                IEnumerable<Node> choice;
-                //if (sensorData.Events.Select(x => x.Event).Contains(Pudge.World.PudgeEvent.Invisible))
-                //    choice = InvestigateWorld(sensorData, graph, SpecRunes);
-                choice = InvestigateWorld(sensorData, graph, Runes);
-                if (choice.Count() == 0)
+                Visited.Check(sensorData.WorldTime);
+                var choice = InvestigateWorld(sensorData, graph, Runes);
+                foreach (var dataEvent in sensorData.Events)
                 {
-                    sensorData = client.Wait(1);
+                    if (dataEvent.Event == PudgeEvent.Invisible || dataEvent.Event == PudgeEvent.Hasted)
+                    {
+                        var choice1 = InvestigateWorld(sensorData, graph, SpecRunes);
+                        var timeRemaining = dataEvent.Duration - (sensorData.WorldTime - dataEvent.Start);
+                        //if (choice1.PathLength / 40 < timeRemaining)
+                        //    choice = choice1;
+                    }
+                }
+                var path = choice.Path.Skip(1);
+                if (path.Count() == 0)
+                {
+                    sensorData = client.Wait(0.5);
                     continue;
                 }
-                foreach (var node in choice)
+                foreach (var node in path)
                     sensorData = Movement.GoTo(sensorData, client, node.Location);
-                Visited.Add(choice.Last().Location);
+                Visited.HashSet.Add(path.Last().Location);
             }
-
 
             // Корректно завершаем работу
             //client.Exit();
         }
 
 
-        public static IEnumerable<Node> InvestigateWorld(PudgeSensorsData data, Graph graph, Point2D[] runes)
+        public static DijkstraAnswer InvestigateWorld(PudgeSensorsData data, Graph graph, Point2D[] runes)
         {
             var toGo = new List<DijkstraAnswer>();
             foreach (var rune in runes)
             {
-                if (Visited.Contains(rune))
+                if (Visited.HashSet.Contains(rune))
                     continue;
                 var loc = data.SelfLocation;
-                var start = graph.Nodes.Where(x => Math.Abs(x.Location.X - loc.X) < 30 && Math.Abs(x.Location.Y - loc.Y) < 30).Single();
+                var start = graph.Nodes.Where(x => Movement.ApproximatelyEqual(loc, x.Location, 20)).Single();
                 var finish = graph.Nodes.Where(x => x.Location == rune).Single();
                 toGo.Add(DijkstraAlgo.Dijkstra(graph, start, finish));
             }
 
-            if (toGo.Count == 0) return new List<Node>();
+            if (toGo.Count == 0) return new DijkstraAnswer(new List<Node>(), 0);
             var min = toGo.Where(x => x.PathLength != 0).Select(x => x.PathLength).Min();
-            var choice = toGo.Where(x => x.PathLength == min).Select(x => x.Path).First().Skip(1);
+            var choice = toGo.Where(x => x.PathLength == min).First();
             return choice;
         }
 
-        public static HashSet<Point2D> checkRunesList(HashSet<Point2D> runesList, double currentTime)
-        {
-            //var list = runesList.Where(x => x.checkTime(currentTime)).ToArray();
-            //var newSet = new HashSet<Point2D>();
-            //foreach(var x in list)
-            //{
-            //    newSet.Add(x); 
-            //}
-            //return newSet; 
-            if (25 - (currentTime % 25) < 2 || currentTime % 25 < 2)
-            {
-                return new HashSet<Point2D>(); 
-            }
-            return runesList; 
-        }
+        //public static HashSet<Point2D> checkRunesList(HashSet<Point2D> runesList, double currentTime)
+        //{
+        //    if (currentTime > 2) 
+        //        if (25 - (currentTime % 25) < 2 || currentTime % 25 < 2)
+        //        {
+        //            return new HashSet<Point2D>(); 
+        //        }
+        //        return runesList; 
+        //}
 
 
     }
 }
 
-
-
-//var dx = Math.Abs(Math.Abs(start.X) - Math.Abs(end.X));
-//var dy = Math.Abs(Math.Abs(start.Y) - Math.Abs(end.Y));
-//var angle = Math.Atan(dy / dx) * -90;
-
-//if (Math.Round(start.X) == Math.Round(end.X))
-//{
-//    var ang = 90 * Math.Sign(dy);
-//    x = client.Rotate(ang);
-//}
-//else if (Math.Round(start.Y) == Math.Round(end.Y))
-//{
-//    x = client.Rotate(90 * Math.Sign(-dx));
-//}
-//else if (dy > 0 && dx < 0)
-//{
-//    x = client.Rotate(angle);
-//}
-//else if ()
-
-//var distance = Math.Sqrt(dx * dx + dy * dy);
-//return client.Move(distance); 
-
-
-
-//var enumerator = graph.Edges.GetEnumerator();
-//var x = client.Move(0);
-//while (enumerator.MoveNext())
-//{
-//    var start = enumerator.Current.From.Location;
-//    var end = enumerator.Current.To.Location;
-//    x = Movement.GoTo(x, client, start, end);
-//}
-
-
-//var point1 = new Point2D(-130, -130); 
-//var point2 = new Point2D(-130, 0);
-//var point3 = new Point2D(-83, 0);
-//var point4 = new Point2D(0, -130);
-//var point5 = new Point2D(0, -100);
-//var point6 = new Point2D(-40, -50);
-//var mid = new Point2D(0, 0);
-
-//x = Movement.GoTo(x, client, point1, point4);
-//x = Movement.GoTo(x, client, point4, point5);
-//x = Movement.GoTo(x, client, point5, point6); 
-//x = Movement.GoTo(x, client, point1, point2);
-//x = Movement.GoTo(x, client, point2, point3);
-////x = MoveTo(x, client, point1, point4);
-////x = MoveTo(x, client, point4, point5);
-//x = Movement.GoTo(x, client, point3, point6);
-//x = Movement.GoTo(x, client, point6, mid);
-
-
-
-//#region Trees
+#region Trees
 //double[][] Trees = new double[][] {
 //                new double[3] {-160.0, 160.0, 0.0 },
 //                new double[3] { -150.0, 160.0, 0.0 },
@@ -446,4 +392,4 @@ namespace PudgeClient
 //                new double[3] { -30.0, 70.0, 0.0 },
 //                new double[3] {  -40.0, 0.0, 0.0 },
 //                new double[3] { 40.0, 0.0, 0.0 }};
-//#endregion
+#endregion
