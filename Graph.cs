@@ -8,7 +8,6 @@ using System.Threading.Tasks;
 
 namespace PudgeClient
 {
-
     public static class NodeExtensions
     {
         public static IEnumerable<Node> DepthSearch(this Node startNode)
@@ -39,9 +38,15 @@ namespace PudgeClient
                 yield return node;
                 foreach (var incidentNode in node.IncidentNodes)
                 {
-                    if (!visited.Contains(incidentNode))
+                    if (visited.Contains(incidentNode))
+                    {
+                        Console.WriteLine("!");
+                    }
+                    else
+                    {
                         visited.Add(incidentNode);
-                    queue.Enqueue(incidentNode);
+                        queue.Enqueue(incidentNode);
+                    }
                 }
             }
         }
@@ -78,11 +83,6 @@ namespace PudgeClient
         public readonly int NodeNumber;
         public readonly Point2D Location;
 
-        public Node()
-        {
-            Location = new Point2D();
-        }
-
         public Node(int number, Point2D p)
         {
             NodeNumber = number;
@@ -107,7 +107,6 @@ namespace PudgeClient
         {
             if (!graph.Nodes.Contains(node1) || !graph.Nodes.Contains(node2)) throw new ArgumentException();
             var edge = new Edge(node1, node2);
-
             node1.edges.Add(edge);
             node2.edges.Add(edge);
             return edge;
