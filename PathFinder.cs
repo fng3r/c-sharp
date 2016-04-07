@@ -24,9 +24,9 @@ namespace PudgeClient
         }
     }
 
-    public class DijkstraAlgo
+    public class PathFinder
     {
-        public static DijkstraAnswer Dijkstra(Graph graph, Node start, Node end)
+        public static DijkstraAnswer DijkstraAlgo(Graph graph, Node start, Node end)
         {
             var notVisited = graph.Nodes.ToList();
             var track = new Dictionary<Node, DijkstraData>();

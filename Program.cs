@@ -86,7 +86,7 @@ namespace PudgeClient
             {
                 new Point2D(-130, -130),        //0
                 new Point2D(-70, -120),         //1
-                new Point2D(0, -123),           //2
+                new Point2D(0, -130),           //2
                 new Point2D(0, -70),            //3
                 new Point2D(-55, -28),          //4
                 new Point2D(55, -28),           //5
@@ -100,7 +100,7 @@ namespace PudgeClient
                 new Point2D(-48, 38),           //13
                 new Point2D(58, 38),            //14
                 new Point2D(0, 70),             //15
-                new Point2D(0, 123),            //16
+                new Point2D(0, 130),            //16
                 new Point2D(70, 120),           //17
                 new Point2D(130, 130),          //18
                 new Point2D(100, -80),           //19
@@ -146,11 +146,9 @@ namespace PudgeClient
                 10, 19,
                 8, 21,
                 16, 21,
-                8, 23,
                 7, 23,
                 21, 23,
                 9, 24,
-                10, 24,
                 19, 24
                 );
 
@@ -175,7 +173,7 @@ namespace PudgeClient
                 var path = choice.Path.Skip(1);
                 if (path.Count() == 0)
                 {
-                    sensorData = client.Wait(0.5);
+                    sensorData = client.Wait(0.01);
                     continue;
                 }
                 foreach (var node in path)
@@ -198,7 +196,7 @@ namespace PudgeClient
                 var loc = data.SelfLocation;
                 var start = graph.Nodes.Where(x => Movement.ApproximatelyEqual(loc, x.Location, 3)).Single();
                 var finish = graph.Nodes.Where(x => x.Location == rune).Single();
-                toGo.Add(DijkstraAlgo.Dijkstra(graph, start, finish));
+                toGo.Add(PathFinder.DijkstraAlgo(graph, start, finish));
             }
 
             if (toGo.Count == 0) return new DijkstraAnswer(new List<Node>(), 0);
@@ -206,18 +204,6 @@ namespace PudgeClient
             var choice = toGo.Where(x => x.PathLength == min).First();
             return choice;
         }
-
-        //public static HashSet<Point2D> checkRunesList(HashSet<Point2D> runesList, double currentTime)
-        //{
-        //    if (currentTime > 2) 
-        //        if (25 - (currentTime % 25) < 2 || currentTime % 25 < 2)
-        //        {
-        //            return new HashSet<Point2D>(); 
-        //        }
-        //        return runesList; 
-        //}
-
-
     }
 }
 
