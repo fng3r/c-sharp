@@ -165,6 +165,8 @@ namespace PudgeClient
                     if (dataEvent.Event == PudgeEvent.Invisible || dataEvent.Event == PudgeEvent.Hasted)
                     {
                         var choice1 = InvestigateWorld(sensorData, graph, SpecRunes);
+                        if (choice1.PathLength == 0)
+                            break;
                         var timeRemaining = dataEvent.Duration - (sensorData.WorldTime - dataEvent.Start);
                         if (choice1.PathLength / 40 < timeRemaining)
                             choice = choice1;
@@ -177,7 +179,16 @@ namespace PudgeClient
                     continue;
                 }
                 foreach (var node in path)
+                {
                     sensorData = Movement.GoTo(sensorData, client, node.Location);
+                    if (sensorData.IsDead)
+                    {
+                        client.Wait(5);
+                        break;
+                    }
+
+                }
+                sensorData = client.Wait(0.03);
                 Visited.HashSet.Add(path.Last().Location);
             }
 
