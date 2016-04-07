@@ -20,7 +20,7 @@ namespace PudgeClient
             var distance = Math.Sqrt(dx * dx + dy * dy);
             var currentState = client.Rotate(rAngle);
             currentState = MoveByLine(client, data, distance);
-            if (!ApproximatelyEqual(currentState.SelfLocation, end, 10))
+            if (!ApproximatelyEqual(currentState.SelfLocation, end, 5))
                 return GoTo(currentState, client, end);
             return currentState;
         }

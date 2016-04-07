@@ -80,8 +80,7 @@ namespace PudgeClient
             Print(sensorData);
 
             // Каждое действие возвращает новые данные с сенсоров.
-            sensorData = client.Move();
-            Print(sensorData);
+
 
             var points = new Point2D[]
             {
@@ -93,21 +92,23 @@ namespace PudgeClient
                 new Point2D(55, -28),           //5
                 new Point2D(0, 0),              //6
                 new Point2D(-83, 0),            //7
-                new Point2D(-146, 0),           //8
+                new Point2D(-130, 0),           //8
                 new Point2D(83, 0),             //9
-                new Point2D(146, 0),            //10
+                new Point2D(130, 0),            //10
                 new Point2D(-120, -70),         //11
                 new Point2D(120, 70),           //12
                 new Point2D(-48, 38),           //13
-                new Point2D(48, 38),            //14
+                new Point2D(58, 38),            //14
                 new Point2D(0, 70),             //15
                 new Point2D(0, 123),            //16
                 new Point2D(70, 120),           //17
                 new Point2D(130, 130),          //18
-                new Point2D(85, -80),           //19
+                new Point2D(100, -80),           //19
                 new Point2D(130, -130),         //20
                 new Point2D(-100, 85),          //21
-                new Point2D(-130, 130)          //22
+                new Point2D(-130, 130),         //22
+                new Point2D(-110, 50),          //23
+                new Point2D(110, -50)            //24
             };
 
             var graph = new Graph(points);
@@ -144,7 +145,13 @@ namespace PudgeClient
                 2, 19,
                 10, 19,
                 8, 21,
-                16, 21
+                16, 21,
+                8, 23,
+                7, 23,
+                21, 23,
+                9, 24,
+                10, 24,
+                19, 24
                 );
 
             // Для удобства, можно подписать свой метод на обработку всех входящих данных с сенсоров.
@@ -161,8 +168,8 @@ namespace PudgeClient
                     {
                         var choice1 = InvestigateWorld(sensorData, graph, SpecRunes);
                         var timeRemaining = dataEvent.Duration - (sensorData.WorldTime - dataEvent.Start);
-                        //if (choice1.PathLength / 40 < timeRemaining)
-                        //    choice = choice1;
+                        if (choice1.PathLength / 40 < timeRemaining)
+                            choice = choice1;
                     }
                 }
                 var path = choice.Path.Skip(1);
@@ -189,7 +196,7 @@ namespace PudgeClient
                 if (Visited.HashSet.Contains(rune))
                     continue;
                 var loc = data.SelfLocation;
-                var start = graph.Nodes.Where(x => Movement.ApproximatelyEqual(loc, x.Location, 20)).Single();
+                var start = graph.Nodes.Where(x => Movement.ApproximatelyEqual(loc, x.Location, 3)).Single();
                 var finish = graph.Nodes.Where(x => x.Location == rune).Single();
                 toGo.Add(DijkstraAlgo.Dijkstra(graph, start, finish));
             }
