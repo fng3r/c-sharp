@@ -14,11 +14,11 @@ namespace PudgeClient
 
         public static Point2D[] Runes = new Point2D[]
         {
-            new Point2D(-70, -120),
+            new Point2D(-70, -130),
             new Point2D(0, 0),
-            new Point2D(-120, -70),
-            new Point2D(70, 120),
-            new Point2D(120, 70)
+            new Point2D(-130, -70),
+            new Point2D(70, 130),
+            new Point2D(130, 70)
         };
 
         public static Point2D[] SpecRunes = new Point2D[]
@@ -85,7 +85,7 @@ namespace PudgeClient
             var points = new Point2D[]
             {
                 new Point2D(-130, -130),        //0
-                new Point2D(-70, -120),         //1
+                new Point2D(-70, -130),         //1
                 new Point2D(0, -130),           //2
                 new Point2D(0, -70),            //3
                 new Point2D(-55, -28),          //4
@@ -95,20 +95,24 @@ namespace PudgeClient
                 new Point2D(-130, 0),           //8
                 new Point2D(83, 0),             //9
                 new Point2D(130, 0),            //10
-                new Point2D(-120, -70),         //11
-                new Point2D(120, 70),           //12
+                new Point2D(-130, -70),         //11
+                new Point2D(130, 70),           //12
                 new Point2D(-48, 38),           //13
                 new Point2D(58, 38),            //14
                 new Point2D(0, 70),             //15
                 new Point2D(0, 130),            //16
-                new Point2D(70, 120),           //17
+                new Point2D(70, 130),           //17
                 new Point2D(130, 130),          //18
                 new Point2D(100, -80),           //19
                 new Point2D(130, -130),         //20
-                new Point2D(-100, 85),          //21
+                new Point2D(-100, 80),          //21
                 new Point2D(-130, 130),         //22
-                new Point2D(-110, 50),          //23
-                new Point2D(110, -50)            //24
+                new Point2D(-100, 50),          //23
+                new Point2D(100, -50),           //24
+                new Point2D(0, 85),             //25
+                new Point2D(0, -85),             //26
+                new Point2D(70, -100),            //27
+                new Point2D(-70, 100)             //28
             };
 
             var graph = new Graph(points);
@@ -149,7 +153,21 @@ namespace PudgeClient
                 7, 23,
                 21, 23,
                 9, 24,
-                19, 24
+                19, 24,
+                21, 25,
+                15, 25,
+                16, 25,
+                2, 26,
+                3, 26,
+                19, 26,
+                2, 27,
+                19, 27,
+                20, 27,
+                16, 28,
+                21, 28,
+                22, 28,
+                3, 27,
+                15, 28
                 );
 
             // Для удобства, можно подписать свой метод на обработку всех входящих данных с сенсоров.
@@ -180,6 +198,7 @@ namespace PudgeClient
                 }
                 foreach (var node in path)
                 {
+                    Visited.Check(sensorData.WorldTime);
                     sensorData = Movement.GoTo(sensorData, client, node.Location);
                     if (sensorData.IsDead)
                     {
@@ -188,8 +207,8 @@ namespace PudgeClient
                     }
 
                 }
-                sensorData = client.Wait(0.03);
                 Visited.HashSet.Add(path.Last().Location);
+                sensorData = client.Wait(0.05);
             }
 
             // Корректно завершаем работу
