@@ -166,8 +166,8 @@ namespace PudgeClient
                 16, 28,
                 21, 28,
                 22, 28,
-                3, 27,
-                15, 28
+                26, 27,
+                15, 25
                 );
 
             // Для удобства, можно подписать свой метод на обработку всех входящих данных с сенсоров.
@@ -177,38 +177,57 @@ namespace PudgeClient
             while (true)
             {
                 Visited.Check(sensorData.WorldTime);
+                var queue = new Queue<DijkstraAnswer>(); 
                 var choice = InvestigateWorld(sensorData, graph, Runes);
+                queue.Enqueue(choice); 
+                //stack.Push(choice); 
                 foreach (var dataEvent in sensorData.Events)
                 {
                     if (dataEvent.Event == PudgeEvent.Invisible || dataEvent.Event == PudgeEvent.Hasted)
                     {
                         var choice1 = InvestigateWorld(sensorData, graph, SpecRunes);
-                        if (choice1.PathLength == 0)
-                            break;
+                        
+                        //if (choice1.PathLength == 0)
+                        //    break;
                         var timeRemaining = dataEvent.Duration - (sensorData.WorldTime - dataEvent.Start);
                         if (choice1.PathLength / 40 < timeRemaining)
-                            choice = choice1;
+                            if (choice1.PathLength > choice.PathLength)
+                            {
+                                choice1 = PathFinder.DijkstraAlgo(graph, choice.Path.Last(), choice1.Path.Last());
+                                queue.Enqueue(choice1);
+                            }
+                            else
+                            {
+                                queue.Dequeue();
+                                queue.Enqueue(choice1);
+                            }
+                                
                     }
                 }
-                var path = choice.Path.Skip(1);
-                if (path.Count() == 0)
+                while (queue.Count != 0)
                 {
-                    sensorData = client.Wait(0.01);
-                    continue;
-                }
-                foreach (var node in path)
-                {
-                    Visited.Check(sensorData.WorldTime);
-                    sensorData = Movement.GoTo(sensorData, client, node.Location);
-                    if (sensorData.IsDead)
+                    
+                    var path = queue.Dequeue().Path.Skip(1);
+                    if (path.Count() == 0)
                     {
-                        client.Wait(5);
-                        break;
+                        sensorData = client.Wait(0.01);
+                        continue;
                     }
+                    foreach (var node in path)
+                    {
+                        Visited.Check(sensorData.WorldTime);
+                        sensorData = Movement.GoTo(sensorData, client, node.Location);
+                        if (sensorData.IsDead)
+                        {
+                            client.Wait(5);
+                            break;
+                        }
 
+                    }
+                    Visited.HashSet.Add(path.Last().Location);
+                    sensorData = client.Wait(0.05);
+                    
                 }
-                Visited.HashSet.Add(path.Last().Location);
-                sensorData = client.Wait(0.05);
             }
 
             // Корректно завершаем работу
@@ -223,10 +242,24 @@ namespace PudgeClient
             {
                 if (Visited.HashSet.Contains(rune))
                     continue;
+                Node begin = new Node(0, new Point2D(0, 0)); 
                 var loc = data.SelfLocation;
-                var start = graph.Nodes.Where(x => Movement.ApproximatelyEqual(loc, x.Location, 3)).Single();
+                var start = graph.Nodes.Where(x => Movement.ApproximatelyEqual(loc, x.Location, 5));
+                if (start.Count() == 0)
+                {
+                    var allRunes = runes.Concat(SpecRunes); 
+                    foreach (var e in allRunes)
+                    {
+                        if (Movement.ApproximatelyEqual(loc, e, 15))
+                            begin = graph.Nodes.Where(x => x.Location == e).Single(); 
+                    }
+                } else
+                {
+                    begin = graph.Nodes.Where(x => Movement.ApproximatelyEqual(loc, x.Location, 5)).Single();
+                }
+                    
                 var finish = graph.Nodes.Where(x => x.Location == rune).Single();
-                toGo.Add(PathFinder.DijkstraAlgo(graph, start, finish));
+                toGo.Add(PathFinder.DijkstraAlgo(graph, begin, finish));
             }
 
             if (toGo.Count == 0) return new DijkstraAnswer(new List<Node>(), 0);
@@ -236,183 +269,3 @@ namespace PudgeClient
         }
     }
 }
-
-#region Trees
-//double[][] Trees = new double[][] {
-//                new double[3] {-160.0, 160.0, 0.0 },
-//                new double[3] { -150.0, 160.0, 0.0 },
-//                new double[3] { -140.0, 160.0, 0.0 },
-//                new double[3] { -130.0, 160.0, 0.0 },
-//                new double[3] { -120.0, 160.0, 0.0 },
-//                new double[3] { -110.0, 160.0, 0.0 },
-//                new double[3] { -100.0, 160.0, 0.0 },
-//                new double[3] { -90.0, 160.0, 0.0 },
-//                new double[3] { -80.0, 160.0, 0.0 },
-//                new double[3] { -70.0, 160.0, 0.0 },
-//                new double[3] { -60.0, 160.0, 0.0 },
-//                new double[3] { -50.0, 160.0, 0.0 },
-//                new double[3] { -40.0, 160.0, 0.0 },
-//                new double[3] { -30.0, 160.0, 0.0 },
-//                new double[3] { -20.0, 160.0, 0.0 },
-//                new double[3] { -10.0, 160.0, 0.0 },
-//                new double[3] { 0.0, 160.0, 0.0 },
-//                new double[3] { 10.0, 160.0, 0.0 },
-//                new double[3] { 20.0, 160.0, 0.0 },
-//                new double[3] { 30.0, 160.0, 0.0 },
-//                new double[3] { 40.0, 160.0, 0.0 },
-//                new double[3] { 50.0, 160.0, 0.0 },
-//                new double[3] { 60.0, 160.0, 0.0 },
-//                new double[3] { 70.0, 160.0, 0.0 },
-//                new double[3] { 80.0, 160.0, 0.0 },
-//                new double[3] { 90.0, 160.0, 0.0 },
-//                new double[3] { 100.0, 160.0, 0.0 },
-//                new double[3] { 110.0, 160.0, 0.0 },
-//                new double[3] { 120.0, 160.0, 0.0 },
-//                new double[3] { 130.0, 160.0, 0.0 },
-//                new double[3] { 140.0, 160.0, 0.0 },
-//                new double[3] { 150.0, 160.0, 0.0 },
-//                new double[3] { -160.0, 160.0, 0.0 },
-//                new double[3] { -160.0, 150.0, 0.0 },
-//                new double[3] { -160.0, 140.0, 0.0 },
-//                new double[3] { -160.0, 130.0, 0.0 },
-//                new double[3] { -160.0, 120.0, 0.0 },
-//                new double[3] { -160.0, 110.0, 0.0 },
-//                new double[3] { -160.0, 100.0, 0.0 },
-//                new double[3] { -160.0, 90.0, 0.0 },
-//                new double[3] { -160.0, 80.0, 0.0 },
-//                new double[3] { -160.0, 70.0, 0.0 },
-//                new double[3] { -160.0, 60.0, 0.0 },
-//                new double[3] { -160.0, 50.0, 0.0 },
-//                new double[3] { -160.0, 40.0, 0.0 },
-//                new double[3] { -160.0, 30.0, 0.0 },
-//                new double[3] { -160.0, 20.0, 0.0 },
-//                new double[3] { -160.0, 10.0, 0.0 },
-//                new double[3] { -160.0, 0.0, 0.0 },
-//                new double[3] { -160.0, -10.0, 0.0 },
-//                new double[3] { -160.0, -20.0, 0.0 },
-//                new double[3] { -160.0, -30.0, 0.0 },
-//                new double[3] { -160.0, -40.0, 0.0 },
-//                new double[3] { -160.0, -50.0, 0.0 },
-//                new double[3] { -160.0, -60.0, 0.0 },
-//                new double[3] { -160.0, -70.0, 0.0 },
-//                new double[3] { -160.0, -80.0, 0.0 },
-//                new double[3] { -160.0, -90.0, 0.0 },
-//                new double[3] { -160.0, -100.0, 0.0 },
-//                new double[3] { -160.0, -110.0, 0.0 },
-//                new double[3] { -160.0, -120.0, 0.0 },
-//                new double[3] { -160.0, -130.0, 0.0 },
-//                new double[3] { -160.0, -140.0, 0.0 },
-//                new double[3] { -160.0, -150.0, 0.0 },
-//                new double[3] { 160.0, -160.0, 0.0 },
-//                new double[3] { 150.0, -160.0, 0.0 },
-//                new double[3] { 140.0, -160.0, 0.0 },
-//                new double[3] { 130.0, -160.0, 0.0 },
-//                new double[3] { 120.0, -160.0, 0.0 },
-//                new double[3] { 110.0, -160.0, 0.0 },
-//                new double[3] { 100.0, -160.0, 0.0 },
-//                new double[3] { 90.0, -160.0, 0.0 },
-//                new double[3] { 80.0, -160.0, 0.0 },
-//                new double[3] { 70.0, -160.0, 0.0 },
-//                new double[3] { 60.0, -160.0, 0.0 },
-//                new double[3] { 50.0, -160.0, 0.0 },
-//                new double[3] { 40.0, -160.0, 0.0 },
-//                new double[3] { 30.0, -160.0, 0.0 },
-//                new double[3] { 20.0, -160.0, 0.0 },
-//                new double[3] { 10.0, -160.0, 0.0 },
-//                new double[3] { 0.0, -160.0, 0.0 },
-//                new double[3] { -10.0, -160.0, 0.0 },
-//                new double[3] { -20.0, -160.0, 0.0 },
-//                new double[3] { -30.0, -160.0, 0.0 },
-//                new double[3] { -40.0, -160.0, 0.0 },
-//                new double[3] { -50.0, -160.0, 0.0 },
-//                new double[3] { -60.0, -160.0, 0.0 },
-//                new double[3] { -70.0, -160.0, 0.0 },
-//                new double[3] { -80.0, -160.0, 0.0 },
-//                new double[3] { -90.0, -160.0, 0.0 },
-//                new double[3] { -100.0, -160.0, 0.0 },
-//                new double[3] { -110.0, -160.0, 0.0 },
-//                new double[3] { -120.0, -160.0, 0.0 },
-//                new double[3] { -130.0, -160.0, 0.0 },
-//                new double[3] { -140.0, -160.0, 0.0 },
-//                new double[3] { -150.0, -160.0, 0.0 },
-//                new double[3] { 160.0, -160.0, 0.0 },
-//                new double[3] { 160.0, -150.0, 0.0 },
-//                new double[3] { 160.0, -140.0, 0.0 },
-//                new double[3] { 160.0, -130.0, 0.0 },
-//                new double[3] { 160.0, -120.0, 0.0 },
-//                new double[3] { 160.0, -110.0, 0.0 },
-//                new double[3] { 160.0, -100.0, 0.0 },
-//                new double[3] { 160.0, -90.0, 0.0 },
-//                new double[3] { 160.0, -80.0, 0.0 },
-//                new double[3] { 160.0, -70.0, 0.0 },
-//                new double[3] { 160.0, -60.0, 0.0 },
-//                new double[3] { 160.0, -50.0, 0.0 },
-//                new double[3] { 160.0, -40.0, 0.0 },
-//                new double[3] { 160.0, -30.0, 0.0 },
-//                new double[3] { 160.0, -20.0, 0.0 },
-//                new double[3] { 160.0, -10.0, 0.0 },
-//                new double[3] { 160.0, 0.0, 0.0 },
-//                new double[3] { 160.0, 10.0, 0.0 },
-//                new double[3] { 160.0, 20.0, 0.0 },
-//                new double[3] { 160.0, 30.0, 0.0 },
-//                new double[3] { 160.0, 40.0, 0.0 },
-//                new double[3] { 160.0, 50.0, 0.0 },
-//                new double[3] { 160.0, 60.0, 0.0 },
-//                new double[3] { 160.0, 70.0, 0.0 },
-//                new double[3] { 160.0, 80.0, 0.0 },
-//                new double[3] { 160.0, 90.0, 0.0 },
-//                new double[3] { 160.0, 100.0, 0.0 },
-//                new double[3] { 160.0, 110.0, 0.0 },
-//                new double[3] { 160.0, 120.0, 0.0 },
-//                new double[3] { 160.0, 130.0, 0.0 },
-//                new double[3] { 160.0, 140.0, 0.0 },
-//                new double[3] { 160.0, 150.0, 0.0 },
-//                new double[3] { 140.0, -80.0, 0.0 },
-//                new double[3] { 130.0, -80.0, 0.0 },
-//                new double[3] { 120.0, -80.0, 0.0 },
-//                new double[3] { 80.0, -140.0, 0.0 },
-//                new double[3] { 80.0, -130.0, 0.0 },
-//                new double[3] { 80.0, -120.0, 0.0 },
-//                new double[3] { -140.0, 80.0, 0.0 },
-//                new double[3] { -130.0, 80.0, 0.0 },
-//                new double[3] { -120.0, 80.0, 0.0 },
-//                new double[3] { -80.0, 140.0, 0.0 },
-//                new double[3] { -80.0, 130.0, 0.0 },
-//                new double[3] { -80.0, 120.0, 0.0 },
-//                new double[3] { -100.0, -100.0, 0.0 },
-//                new double[3] { -90.0, -90.0, 0.0 },
-//                new double[3] { -80.0, -80.0, 0.0 },
-//                new double[3] { -100.0, -30.0, 0.0 },
-//                new double[3] { -90.0, -40.0, 0.0 },
-//                new double[3] { -80.0, -50.0, 0.0 },
-//                new double[3] { -70.0, -60.0, 0.0 },
-//                new double[3] { -60.0, -70.0, 0.0 },
-//                new double[3] { -50.0, -80.0, 0.0 },
-//                new double[3] { -40.0, -90.0, 0.0 },
-//                new double[3] { -30.0, -100.0, 0.0 },
-//                new double[3] { 100.0, 100.0, 0.0 },
-//                new double[3] { 90.0, 90.0, 0.0 },
-//                new double[3] { 80.0, 80.0, 0.0 },
-//                new double[3] { 100.0, 30.0, 0.0 },
-//                new double[3] { 90.0, 40.0, 0.0 },
-//                new double[3] { 80.0, 50.0, 0.0 },
-//                new double[3] { 70.0, 60.0, 0.0 },
-//                new double[3] { 60.0, 70.0, 0.0 },
-//                new double[3] { 50.0, 80.0, 0.0 },
-//                new double[3] { 40.0, 90.0, 0.0 },
-//                new double[3] { 30.0, 100.0, 0.0 },
-//                new double[3] { 80.0, -40.0, 0.0 },
-//                new double[3] { 70.0, -50.0, 0.0 },
-//                new double[3] { 60.0, -50.0, 0.0 },
-//                new double[3] { 50.0, -60.0, 0.0 },
-//                new double[3] { 40.0, -60.0, 0.0 },
-//                new double[3] { 30.0, -70.0, 0.0 },
-//                new double[3] { -80.0, 40.0, 0.0 },
-//                new double[3] { -70.0, 50.0, 0.0 },
-//                new double[3] { -60.0, 50.0, 0.0 },
-//                new double[3] { -50.0, 60.0, 0.0 },
-//                new double[3] { -40.0, 60.0, 0.0 },
-//                new double[3] { -30.0, 70.0, 0.0 },
-//                new double[3] {  -40.0, 0.0, 0.0 },
-//                new double[3] { 40.0, 0.0, 0.0 }};
-#endregion
