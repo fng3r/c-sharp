@@ -1,39 +1,22 @@
 ﻿using System;
 using Pudge;
 using Pudge.Player;
+using Pudge.World;
 using AIRLab.Mathematics;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace PudgeClient
 {
     class Program
     {
-        const string CvarcTag = "Получи кварк-тэг на сайте";
-
-        // Пример визуального отображения данных с сенсоров при отладке.
-        // Если какая-то информация кажется вам лишней, можете закомментировать что-нибудь.
-        static PudgeSensorsData MoveTo(PudgeClientLevel1 client, PudgeSensorsData data, double x, double y)
-        {
-            client.Wait(0.5);
-            Console.WriteLine("current: X - {0},    Y - {1}", data.SelfLocation.X, data.SelfLocation.Y);
-            var dx = x - data.SelfLocation.X;
-            var dy = y - data.SelfLocation.Y;
-            Console.WriteLine("DX: {0}, DY: {1}", dx, dy);
-            var angle = Math.Atan2(dy, dx) * 180 / Math.PI;
-            Console.WriteLine("needed: {0}, self: {1}", angle, data.SelfLocation.Angle);
-            var rAngle = (angle - data.SelfLocation.Angle) % 360;
-            if (Math.Abs(rAngle) > 180)
-                rAngle -= Math.Sign(rAngle) * 360;
-            Console.WriteLine("!!" + rAngle);
-            client.Rotate(rAngle);
-            return client.Move(Math.Sqrt(dx * dx + dy * dy));
-        }
+        const string CvarcTag = "85e664b5-7ce7-4a0c-88b8-82982d040b70";
 
         static void Print(PudgeSensorsData data)
         {
             Console.WriteLine("---------------------------------");
             if (data.IsDead)
             {
-                // Правильное обращение со смертью.
                 Console.WriteLine("Ooops, i'm dead :(");
                 return;
             }
@@ -54,35 +37,15 @@ namespace PudgeClient
         static void Main(string[] args)
         {
             if (args.Length == 0)
-                args = new[] { "127.0.0.1", "14000" };
+                //args = new[] { "127.0.0.1", "14000" };
+            args = new[] { "87.224.245.130", "14001" };
+
             var ip = args[0];
             var port = int.Parse(args[1]);
 
+
             // Каждую неделю клиент будет новый. Соотетственно Level1, Level2 и Level3.
             var client = new PudgeClientLevel1();
-
-            var points = new Point2D[]
-            {
-                new Point2D(-123, -123),
-                new Point2D(-70, -120),
-                new Point2D(0, -123),
-                new Point2D(0, -90),
-                new Point2D(-48, 38),
-                new Point2D(0, 0),
-                new Point2D(48, 38)
-            };
-
-            var graph = new Graph(points);
-            graph.MakeBounds(
-                0, 1,
-                1, 2,
-                2, 3,
-                3, 4,
-                4, 5,
-                4, 6,
-                5, 6,
-                3, 5,
-                3, 6);
 
             // У этого метода так же есть необязательные аргументы:
             // timeLimit -- время в секундах, сколько будет идти матч (по умолчанию 90)
@@ -91,51 +54,270 @@ namespace PudgeClient
             // isOnLeftSide -- предпочитаемая сторона. Принимается во внимание во время отладки. По умолчанию true.
             // seed -- источник энтропии для случайного появления рун. По умолчанию -- 0. 
             // При изменении руны будут появляться в другом порядке
+            // speedUp -- ускорение отладки в два раза. Может вызывать снижение FPS на слабых машинах
+
+            
+           
+
             var sensorData = client.Configurate(ip, port, CvarcTag);
 
-            // Каждое действие возвращает данные с сенсоров.
-            sensorData = MoveTo(client, sensorData, 0, -123);
+            // Пудж узнает о всех событиях, происходящих в мире, с помощью сенсоров.
+            // Для передачи и представления данных с сенсоров служат объекты класса PudgeSensorsData.
             Print(sensorData);
+
+            // Каждое действие возвращает новые данные с сенсоров.
+
 
             // Для удобства, можно подписать свой метод на обработку всех входящих данных с сенсоров.
             // С этого момента любое действие приведет к отображению в консоли всех данных
             client.SensorDataReceived += Print;
-            sensorData = MoveTo(client, sensorData, 0, 0);
-            sensorData = MoveTo(client, sensorData, 0, 70);
-            sensorData = MoveTo(client, sensorData, -48, 38);
-            sensorData = MoveTo(client, sensorData, -83, 0);
-            sensorData = MoveTo(client, sensorData, -146, 0);
-            sensorData = MoveTo(client, sensorData, -120, -70);
+            var points = PrepareForBattle.GetPoints();
+            var graph = PrepareForBattle.MakeGraph(points);
+            var runes = PrepareForBattle.GetRunes();
+            var specRunes = PrepareForBattle.GetSpecialRunes();
+            var visited = new RuneHashSet();
+
+            while (true)
+            {
+                visited.Check(sensorData.WorldTime);
+                var choice = InvestigateWorld(sensorData, graph, runes, visited);
+                foreach (var dataEvent in sensorData.Events)
+                {
+                    if (dataEvent.Event == PudgeEvent.Invisible || dataEvent.Event == PudgeEvent.Hasted)
+                    {
+                        var choice1 = InvestigateWorld(sensorData, graph, specRunes, visited);
+                        if (choice1.PathLength == 0)
+                            break;
+                        var timeRemaining = dataEvent.Duration - (sensorData.WorldTime - dataEvent.Start);
+                        if (choice1.PathLength / 40 < timeRemaining)
+                        {
+                            choice = choice1;
+                        }
+                    }
+                }
+                var path = choice.Path.Skip(1);
+                if (path.Count() == 0)
+                {
+                    sensorData = client.Wait(0.01);
+                    continue;
+                }
+                foreach (var node in path)
+                {
+                    visited.Check(sensorData.WorldTime);
+                    sensorData = client.GoTo(sensorData, node.Location, visited);
+                    if (sensorData.IsDead)
+                    {
+                        client.Wait(5);
+                        break;
+                    }
+
+                }
+                visited.HashSet.Add(path.Last().Location);
+                sensorData = client.Wait(0.05);
+            }
+
+            // Корректно завершаем работу
+            //client.Exit();
+        }
 
 
-            // Угол поворота указывается в градусах, против часовой стрелки.
-            // Для поворота по часовой стрелке используйте отрицательные значения.
-            //client.Rotate(-45);
+        public static DijkstraAnswer InvestigateWorld(PudgeSensorsData data, Graph graph, Point2D[] runes, RuneHashSet visited)
+        {
+            var toGo = new List<DijkstraAnswer>();
+            foreach (var rune in runes)
+            {
+                if (visited.HashSet.Contains(rune))
+                    continue ;
+                var loc = data.SelfLocation;
+                var start = graph.Nodes.Where(x => Movement.ApproximatelyEqual(loc, x.Location, 5)).Single();
+                var finish = graph.Nodes.Where(x => x.Location == rune).Single();
+                toGo.Add(PathFinder.DijkstraAlgo(graph, start, finish));
+            }
 
-            //client.Move(60);
-            //client.Wait(0.1);
-
-            //// Так можно хукать, но на первом уровне эта команда будет игнорироваться.
-            //client.Hook();
-            //client.Rotate(-170);
-            //client.Move();
-            //client.Wait(4);
-            //client.Rotate(351);
-            //client.Move();
-            //for (int i = 0; i < 10; i++)
-            //{
-            //    if (i == 1) client.Rotate(90);
-            //    client.Move(50);
-            //}
-
-            //// Пример длинного движения. Move(100) лучше не писать. Мало ли что произойдет за это время ;) 
-            //for (int i = 0; i < 50; i++)
-            //{
-            //    client.Move(3);
-            //}
-            //client.Wait(5);
-            //// Корректно завершаем работу
-            client.Exit();
+            if (toGo.Count == 0) return new DijkstraAnswer(new List<Node>(), 0);
+            var min = toGo.Where(x => x.PathLength != 0).Select(x => x.PathLength).Min();
+            var choice = toGo.Where(x => x.PathLength == min).First();
+            return choice;
         }
     }
 }
+
+#region Trees
+//double[][] Trees = new double[][] {
+//                new double[3] {-160.0, 160.0, 0.0 },
+//                new double[3] { -150.0, 160.0, 0.0 },
+//                new double[3] { -140.0, 160.0, 0.0 },
+//                new double[3] { -130.0, 160.0, 0.0 },
+//                new double[3] { -120.0, 160.0, 0.0 },
+//                new double[3] { -110.0, 160.0, 0.0 },
+//                new double[3] { -100.0, 160.0, 0.0 },
+//                new double[3] { -90.0, 160.0, 0.0 },
+//                new double[3] { -80.0, 160.0, 0.0 },
+//                new double[3] { -70.0, 160.0, 0.0 },
+//                new double[3] { -60.0, 160.0, 0.0 },
+//                new double[3] { -50.0, 160.0, 0.0 },
+//                new double[3] { -40.0, 160.0, 0.0 },
+//                new double[3] { -30.0, 160.0, 0.0 },
+//                new double[3] { -20.0, 160.0, 0.0 },
+//                new double[3] { -10.0, 160.0, 0.0 },
+//                new double[3] { 0.0, 160.0, 0.0 },
+//                new double[3] { 10.0, 160.0, 0.0 },
+//                new double[3] { 20.0, 160.0, 0.0 },
+//                new double[3] { 30.0, 160.0, 0.0 },
+//                new double[3] { 40.0, 160.0, 0.0 },
+//                new double[3] { 50.0, 160.0, 0.0 },
+//                new double[3] { 60.0, 160.0, 0.0 },
+//                new double[3] { 70.0, 160.0, 0.0 },
+//                new double[3] { 80.0, 160.0, 0.0 },
+//                new double[3] { 90.0, 160.0, 0.0 },
+//                new double[3] { 100.0, 160.0, 0.0 },
+//                new double[3] { 110.0, 160.0, 0.0 },
+//                new double[3] { 120.0, 160.0, 0.0 },
+//                new double[3] { 130.0, 160.0, 0.0 },
+//                new double[3] { 140.0, 160.0, 0.0 },
+//                new double[3] { 150.0, 160.0, 0.0 },
+//                new double[3] { -160.0, 160.0, 0.0 },
+//                new double[3] { -160.0, 150.0, 0.0 },
+//                new double[3] { -160.0, 140.0, 0.0 },
+//                new double[3] { -160.0, 130.0, 0.0 },
+//                new double[3] { -160.0, 120.0, 0.0 },
+//                new double[3] { -160.0, 110.0, 0.0 },
+//                new double[3] { -160.0, 100.0, 0.0 },
+//                new double[3] { -160.0, 90.0, 0.0 },
+//                new double[3] { -160.0, 80.0, 0.0 },
+//                new double[3] { -160.0, 70.0, 0.0 },
+//                new double[3] { -160.0, 60.0, 0.0 },
+//                new double[3] { -160.0, 50.0, 0.0 },
+//                new double[3] { -160.0, 40.0, 0.0 },
+//                new double[3] { -160.0, 30.0, 0.0 },
+//                new double[3] { -160.0, 20.0, 0.0 },
+//                new double[3] { -160.0, 10.0, 0.0 },
+//                new double[3] { -160.0, 0.0, 0.0 },
+//                new double[3] { -160.0, -10.0, 0.0 },
+//                new double[3] { -160.0, -20.0, 0.0 },
+//                new double[3] { -160.0, -30.0, 0.0 },
+//                new double[3] { -160.0, -40.0, 0.0 },
+//                new double[3] { -160.0, -50.0, 0.0 },
+//                new double[3] { -160.0, -60.0, 0.0 },
+//                new double[3] { -160.0, -70.0, 0.0 },
+//                new double[3] { -160.0, -80.0, 0.0 },
+//                new double[3] { -160.0, -90.0, 0.0 },
+//                new double[3] { -160.0, -100.0, 0.0 },
+//                new double[3] { -160.0, -110.0, 0.0 },
+//                new double[3] { -160.0, -120.0, 0.0 },
+//                new double[3] { -160.0, -130.0, 0.0 },
+//                new double[3] { -160.0, -140.0, 0.0 },
+//                new double[3] { -160.0, -150.0, 0.0 },
+//                new double[3] { 160.0, -160.0, 0.0 },
+//                new double[3] { 150.0, -160.0, 0.0 },
+//                new double[3] { 140.0, -160.0, 0.0 },
+//                new double[3] { 130.0, -160.0, 0.0 },
+//                new double[3] { 120.0, -160.0, 0.0 },
+//                new double[3] { 110.0, -160.0, 0.0 },
+//                new double[3] { 100.0, -160.0, 0.0 },
+//                new double[3] { 90.0, -160.0, 0.0 },
+//                new double[3] { 80.0, -160.0, 0.0 },
+//                new double[3] { 70.0, -160.0, 0.0 },
+//                new double[3] { 60.0, -160.0, 0.0 },
+//                new double[3] { 50.0, -160.0, 0.0 },
+//                new double[3] { 40.0, -160.0, 0.0 },
+//                new double[3] { 30.0, -160.0, 0.0 },
+//                new double[3] { 20.0, -160.0, 0.0 },
+//                new double[3] { 10.0, -160.0, 0.0 },
+//                new double[3] { 0.0, -160.0, 0.0 },
+//                new double[3] { -10.0, -160.0, 0.0 },
+//                new double[3] { -20.0, -160.0, 0.0 },
+//                new double[3] { -30.0, -160.0, 0.0 },
+//                new double[3] { -40.0, -160.0, 0.0 },
+//                new double[3] { -50.0, -160.0, 0.0 },
+//                new double[3] { -60.0, -160.0, 0.0 },
+//                new double[3] { -70.0, -160.0, 0.0 },
+//                new double[3] { -80.0, -160.0, 0.0 },
+//                new double[3] { -90.0, -160.0, 0.0 },
+//                new double[3] { -100.0, -160.0, 0.0 },
+//                new double[3] { -110.0, -160.0, 0.0 },
+//                new double[3] { -120.0, -160.0, 0.0 },
+//                new double[3] { -130.0, -160.0, 0.0 },
+//                new double[3] { -140.0, -160.0, 0.0 },
+//                new double[3] { -150.0, -160.0, 0.0 },
+//                new double[3] { 160.0, -160.0, 0.0 },
+//                new double[3] { 160.0, -150.0, 0.0 },
+//                new double[3] { 160.0, -140.0, 0.0 },
+//                new double[3] { 160.0, -130.0, 0.0 },
+//                new double[3] { 160.0, -120.0, 0.0 },
+//                new double[3] { 160.0, -110.0, 0.0 },
+//                new double[3] { 160.0, -100.0, 0.0 },
+//                new double[3] { 160.0, -90.0, 0.0 },
+//                new double[3] { 160.0, -80.0, 0.0 },
+//                new double[3] { 160.0, -70.0, 0.0 },
+//                new double[3] { 160.0, -60.0, 0.0 },
+//                new double[3] { 160.0, -50.0, 0.0 },
+//                new double[3] { 160.0, -40.0, 0.0 },
+//                new double[3] { 160.0, -30.0, 0.0 },
+//                new double[3] { 160.0, -20.0, 0.0 },
+//                new double[3] { 160.0, -10.0, 0.0 },
+//                new double[3] { 160.0, 0.0, 0.0 },
+//                new double[3] { 160.0, 10.0, 0.0 },
+//                new double[3] { 160.0, 20.0, 0.0 },
+//                new double[3] { 160.0, 30.0, 0.0 },
+//                new double[3] { 160.0, 40.0, 0.0 },
+//                new double[3] { 160.0, 50.0, 0.0 },
+//                new double[3] { 160.0, 60.0, 0.0 },
+//                new double[3] { 160.0, 70.0, 0.0 },
+//                new double[3] { 160.0, 80.0, 0.0 },
+//                new double[3] { 160.0, 90.0, 0.0 },
+//                new double[3] { 160.0, 100.0, 0.0 },
+//                new double[3] { 160.0, 110.0, 0.0 },
+//                new double[3] { 160.0, 120.0, 0.0 },
+//                new double[3] { 160.0, 130.0, 0.0 },
+//                new double[3] { 160.0, 140.0, 0.0 },
+//                new double[3] { 160.0, 150.0, 0.0 },
+//                new double[3] { 140.0, -80.0, 0.0 },
+//                new double[3] { 130.0, -80.0, 0.0 },
+//                new double[3] { 120.0, -80.0, 0.0 },
+//                new double[3] { 80.0, -140.0, 0.0 },
+//                new double[3] { 80.0, -130.0, 0.0 },
+//                new double[3] { 80.0, -120.0, 0.0 },
+//                new double[3] { -140.0, 80.0, 0.0 },
+//                new double[3] { -130.0, 80.0, 0.0 },
+//                new double[3] { -120.0, 80.0, 0.0 },
+//                new double[3] { -80.0, 140.0, 0.0 },
+//                new double[3] { -80.0, 130.0, 0.0 },
+//                new double[3] { -80.0, 120.0, 0.0 },
+//                new double[3] { -100.0, -100.0, 0.0 },
+//                new double[3] { -90.0, -90.0, 0.0 },
+//                new double[3] { -80.0, -80.0, 0.0 },
+//                new double[3] { -100.0, -30.0, 0.0 },
+//                new double[3] { -90.0, -40.0, 0.0 },
+//                new double[3] { -80.0, -50.0, 0.0 },
+//                new double[3] { -70.0, -60.0, 0.0 },
+//                new double[3] { -60.0, -70.0, 0.0 },
+//                new double[3] { -50.0, -80.0, 0.0 },
+//                new double[3] { -40.0, -90.0, 0.0 },
+//                new double[3] { -30.0, -100.0, 0.0 },
+//                new double[3] { 100.0, 100.0, 0.0 },
+//                new double[3] { 90.0, 90.0, 0.0 },
+//                new double[3] { 80.0, 80.0, 0.0 },
+//                new double[3] { 100.0, 30.0, 0.0 },
+//                new double[3] { 90.0, 40.0, 0.0 },
+//                new double[3] { 80.0, 50.0, 0.0 },
+//                new double[3] { 70.0, 60.0, 0.0 },
+//                new double[3] { 60.0, 70.0, 0.0 },
+//                new double[3] { 50.0, 80.0, 0.0 },
+//                new double[3] { 40.0, 90.0, 0.0 },
+//                new double[3] { 30.0, 100.0, 0.0 },
+//                new double[3] { 80.0, -40.0, 0.0 },
+//                new double[3] { 70.0, -50.0, 0.0 },
+//                new double[3] { 60.0, -50.0, 0.0 },
+//                new double[3] { 50.0, -60.0, 0.0 },
+//                new double[3] { 40.0, -60.0, 0.0 },
+//                new double[3] { 30.0, -70.0, 0.0 },
+//                new double[3] { -80.0, 40.0, 0.0 },
+//                new double[3] { -70.0, 50.0, 0.0 },
+//                new double[3] { -60.0, 50.0, 0.0 },
+//                new double[3] { -50.0, 60.0, 0.0 },
+//                new double[3] { -40.0, 60.0, 0.0 },
+//                new double[3] { -30.0, 70.0, 0.0 },
+//                new double[3] {  -40.0, 0.0, 0.0 },
+//                new double[3] { 40.0, 0.0, 0.0 }};
+#endregion
