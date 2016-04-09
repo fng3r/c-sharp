@@ -19,17 +19,17 @@ namespace PudgeClient
         
         bool NeedToClear(double currentTime)
         {
-            return currentTime - clearTime > 2;
+            return currentTime - clearTime > 5;
         }
 
         public void Check(double currentTime)
         {
             if (NeedToClear(currentTime))
-                if (25 - (currentTime % 25) < 2 || currentTime % 25 < 2)
+                if (25 - (currentTime % 25) < 1 || currentTime % 25 < 1)
                 {
                     HashSet = new HashSet<Point2D>();
                     clearTime = currentTime;
-                }           
+                }
         }
     }
 }

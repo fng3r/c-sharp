@@ -18,12 +18,13 @@ namespace PudgeClient
             var dy = end.Y - data.SelfLocation.Y;
             var rAngle = FindAngle(data, dx, dy);
             var distance = Math.Sqrt(dx * dx + dy * dy);
-            var currentState = client.Rotate(rAngle);
-            currentState = MoveByLine(client, data, distance);
-            if (!currentState.IsDead)
-                if (!ApproximatelyEqual(currentState.SelfLocation, end, 5))
-                    return GoTo(currentState, client, end);
-            return currentState;
+            if (Math.Abs(rAngle) > 5)
+                data = client.Rotate(rAngle);
+            data = MoveByLine(client, data, distance);
+            if (!data.IsDead)
+                if (!ApproximatelyEqual(data.SelfLocation, end, 3))
+                    return GoTo(data, client, end);
+            return data;
         }
 
         public static double FindAngle(PudgeSensorsData data, double dx, double dy)
@@ -38,16 +39,15 @@ namespace PudgeClient
         public static PudgeSensorsData MoveByLine(PudgeClientLevel1 client, PudgeSensorsData data, double distance)
         {
             var step = distance / 10.0;
-            var currentState = new PudgeSensorsData();
 
             for (var i = 0; i < 10; i++)
             {
-                currentState = client.Move(step);
+                data = client.Move(step);
                 if (data.IsDead)
                     break;
                 checkSomething();
             }
-            return currentState;
+            return data;
         }
 
         public static void checkSomething()
@@ -59,6 +59,10 @@ namespace PudgeClient
         {
             return Math.Abs(self.X - loc.X) < deviation && Math.Abs(self.Y - loc.Y) < deviation;
         }
-        
+
+        public static bool ApproximatelyEqual(LocatorItem self, LocatorItem loc, double deviation)
+        {
+            return Math.Abs(self.X - loc.X) < deviation && Math.Abs(self.Y - loc.Y) < deviation;
+        }
     }
 }

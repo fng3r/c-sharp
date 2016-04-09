@@ -10,24 +10,7 @@ namespace PudgeClient
 {
     class Program
     {
-        const string CvarcTag = "Получи кварк-тэг на сайте";
-
-        public static Point2D[] Runes = new Point2D[]
-        {
-            new Point2D(-70, -130),
-            new Point2D(0, 0),
-            new Point2D(-130, -70),
-            new Point2D(70, 130),
-            new Point2D(130, 70)
-        };
-
-        public static Point2D[] SpecRunes = new Point2D[]
-        {
-            new Point2D(-130, 130),
-            new Point2D(130, -130)
-        };
-
-        public static RuneHashSet Visited = new RuneHashSet();
+        const string CvarcTag = "85e664b5-7ce7-4a0c-88b8-82982d040b70";
 
         static void Print(PudgeSensorsData data)
         {
@@ -41,7 +24,7 @@ namespace PudgeClient
             Console.WriteLine("My score now: {0}", data.SelfScores);
             Console.WriteLine("Current time: {0:F}", data.WorldTime);
             foreach (var rune in data.Map.Runes)
-                Console.WriteLine("Point2D! Type: {0}, Size = {1}, Location: {2}", rune.Type, rune.Size, rune.Location);
+                Console.WriteLine("Rune! Type: {0}, Size = {1}, Location: {2}", rune.Type, rune.Size, rune.Location);
             foreach (var heroData in data.Map.Heroes)
                 Console.WriteLine("Enemy! Type: {0}, Location: {1}, Angle: {2:F}", heroData.Type, heroData.Location, heroData.Angle);
             foreach (var eventData in data.Events)
@@ -54,9 +37,12 @@ namespace PudgeClient
         static void Main(string[] args)
         {
             if (args.Length == 0)
-                args = new[] {"127.0.0.1", "14000"};
+                //args = new[] { "127.0.0.1", "14000" };
+            args = new[] { "87.224.245.130", "14001" };
+
             var ip = args[0];
             var port = int.Parse(args[1]);
+
 
             // Каждую неделю клиент будет новый. Соотетственно Level1, Level2 и Level3.
             var client = new PudgeClientLevel1();
@@ -82,112 +68,31 @@ namespace PudgeClient
             // Каждое действие возвращает новые данные с сенсоров.
 
 
-            var points = new Point2D[]
-            {
-                new Point2D(-130, -130),        //0
-                new Point2D(-70, -130),         //1
-                new Point2D(0, -130),           //2
-                new Point2D(0, -70),            //3
-                new Point2D(-55, -28),          //4
-                new Point2D(55, -28),           //5
-                new Point2D(0, 0),              //6
-                new Point2D(-83, 0),            //7
-                new Point2D(-130, 0),           //8
-                new Point2D(83, 0),             //9
-                new Point2D(130, 0),            //10
-                new Point2D(-130, -70),         //11
-                new Point2D(130, 70),           //12
-                new Point2D(-48, 38),           //13
-                new Point2D(58, 38),            //14
-                new Point2D(0, 70),             //15
-                new Point2D(0, 130),            //16
-                new Point2D(70, 130),           //17
-                new Point2D(130, 130),          //18
-                new Point2D(100, -80),           //19
-                new Point2D(130, -130),         //20
-                new Point2D(-100, 80),          //21
-                new Point2D(-130, 130),         //22
-                new Point2D(-100, 50),          //23
-                new Point2D(100, -50),           //24
-                new Point2D(0, 85),             //25
-                new Point2D(0, -85),             //26
-                new Point2D(70, -100),            //27
-                new Point2D(-70, 100)             //28
-            };
-
-            var graph = new Graph(points);
-            graph = graph.MakeBounds(
-                0, 1,
-                1, 2,
-                2, 3,
-                3, 4,
-                3, 5,
-                3, 6,
-                4, 6,
-                4, 5,
-                5, 6,
-                4, 7,
-                7, 8,
-                8, 11,
-                5, 9,
-                9, 10,
-                10, 12,
-                6, 13,
-                6, 14,
-                6, 15,
-                7, 13,
-                9, 14,
-                13, 15,
-                14, 15,
-                15, 16,
-                16, 17,
-                17, 18,
-                12, 18,
-                0, 11,
-                19, 20,
-                21, 22,
-                2, 19,
-                10, 19,
-                8, 21,
-                16, 21,
-                7, 23,
-                21, 23,
-                9, 24,
-                19, 24,
-                21, 25,
-                15, 25,
-                16, 25,
-                2, 26,
-                3, 26,
-                19, 26,
-                2, 27,
-                19, 27,
-                20, 27,
-                16, 28,
-                21, 28,
-                22, 28,
-                3, 27,
-                15, 28
-                );
-
             // Для удобства, можно подписать свой метод на обработку всех входящих данных с сенсоров.
             // С этого момента любое действие приведет к отображению в консоли всех данных
             client.SensorDataReceived += Print;
+            var points = PrepareForBattle.GetPoints();
+            var graph = PrepareForBattle.MakeGraph(points);
+            Point2D[] runes = PrepareForBattle.GetRunes();
 
+            Point2D[] specRunes = PrepareForBattle.GetSpecialRunes();
+            var visited = new RuneHashSet();
             while (true)
             {
-                Visited.Check(sensorData.WorldTime);
-                var choice = InvestigateWorld(sensorData, graph, Runes);
+                visited.Check(sensorData.WorldTime);
+                var choice = InvestigateWorld(sensorData, graph, runes, visited);
                 foreach (var dataEvent in sensorData.Events)
                 {
                     if (dataEvent.Event == PudgeEvent.Invisible || dataEvent.Event == PudgeEvent.Hasted)
                     {
-                        var choice1 = InvestigateWorld(sensorData, graph, SpecRunes);
+                        var choice1 = InvestigateWorld(sensorData, graph, specRunes, visited);
                         if (choice1.PathLength == 0)
                             break;
                         var timeRemaining = dataEvent.Duration - (sensorData.WorldTime - dataEvent.Start);
                         if (choice1.PathLength / 40 < timeRemaining)
+                        {
                             choice = choice1;
+                        }
                     }
                 }
                 var path = choice.Path.Skip(1);
@@ -198,8 +103,8 @@ namespace PudgeClient
                 }
                 foreach (var node in path)
                 {
-                    Visited.Check(sensorData.WorldTime);
-                    sensorData = Movement.GoTo(sensorData, client, node.Location);
+                    visited.Check(sensorData.WorldTime);
+                    sensorData = client.GoTo(sensorData, node.Location, visited);
                     if (sensorData.IsDead)
                     {
                         client.Wait(5);
@@ -207,7 +112,7 @@ namespace PudgeClient
                     }
 
                 }
-                Visited.HashSet.Add(path.Last().Location);
+                visited.HashSet.Add(path.Last().Location);
                 sensorData = client.Wait(0.05);
             }
 
@@ -216,15 +121,15 @@ namespace PudgeClient
         }
 
 
-        public static DijkstraAnswer InvestigateWorld(PudgeSensorsData data, Graph graph, Point2D[] runes)
+        public static DijkstraAnswer InvestigateWorld(PudgeSensorsData data, Graph graph, Point2D[] runes, RuneHashSet visited)
         {
             var toGo = new List<DijkstraAnswer>();
             foreach (var rune in runes)
             {
-                if (Visited.HashSet.Contains(rune))
-                    continue;
+                if (visited.HashSet.Contains(rune))
+                    continue ;
                 var loc = data.SelfLocation;
-                var start = graph.Nodes.Where(x => Movement.ApproximatelyEqual(loc, x.Location, 3)).Single();
+                var start = graph.Nodes.Where(x => Movement.ApproximatelyEqual(loc, x.Location, 5)).Single();
                 var finish = graph.Nodes.Where(x => x.Location == rune).Single();
                 toGo.Add(PathFinder.DijkstraAlgo(graph, start, finish));
             }
