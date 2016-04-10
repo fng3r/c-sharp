@@ -37,8 +37,8 @@ namespace PudgeClient
         static void Main(string[] args)
         {
             if (args.Length == 0)
-                //args = new[] { "127.0.0.1", "14000" };
-            args = new[] { "87.224.245.130", "14001" };
+                args = new[] { "127.0.0.1", "14000" };
+            //args = new[] { "87.224.245.130", "14001" };
 
             var ip = args[0];
             var port = int.Parse(args[1]);
@@ -76,9 +76,10 @@ namespace PudgeClient
             var runes = PrepareForBattle.GetRunes();
             var specRunes = PrepareForBattle.GetSpecialRunes();
             var visited = new RuneHashSet();
-
+            var central = new Point2D(0, 0);
             while (true)
             {
+
                 visited.Check(sensorData.WorldTime);
                 var choice = InvestigateWorld(sensorData, graph, runes, visited);
                 foreach (var dataEvent in sensorData.Events)
@@ -121,7 +122,7 @@ namespace PudgeClient
         }
 
 
-        public static DijkstraAnswer InvestigateWorld(PudgeSensorsData data, Graph graph, Point2D[] runes, RuneHashSet visited)
+        public static DijkstraAnswer InvestigateWorld(PudgeSensorsData data, Graph graph, IEnumerable<Point2D> runes, RuneHashSet visited)
         {
             var toGo = new List<DijkstraAnswer>();
             foreach (var rune in runes)
