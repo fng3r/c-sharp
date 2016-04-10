@@ -71,12 +71,17 @@ namespace PudgeClient
             // Для удобства, можно подписать свой метод на обработку всех входящих данных с сенсоров.
             // С этого момента любое действие приведет к отображению в консоли всех данных
             client.SensorDataReceived += Print;
+
             var points = PrepareForBattle.GetPoints();
             var graph = PrepareForBattle.MakeGraph(points);
             var runes = PrepareForBattle.GetRunes();
             var specRunes = PrepareForBattle.GetSpecialRunes();
             var visited = new RuneHashSet();
             var central = new Point2D(0, 0);
+            //if (sensorData.SelfLocation.X < 0)
+            //    sensorData = client.GoTo(sensorData, new Point2D(-115, -115), visited);
+            //else
+            //    sensorData = client.GoTo(sensorData, new Point2D(115, 115), visited);
             while (true)
             {
                 if (!visited.Contains(central))
@@ -144,7 +149,7 @@ namespace PudgeClient
                 if (visited.HashSet.Contains(rune))
                     continue ;
                 var loc = data.SelfLocation;
-                var start = graph.Nodes.Where(x => Movement.ApproximatelyEqual(loc, x.Location, 15)).Single();
+                var start = graph.Nodes.Where(x => Movement.ApproximatelyEqual(loc, x.Location, 20)).Single();
                 var finish = graph.Nodes.Where(x => x.Location == rune).Single();
                 toGo.Add(PathFinder.DijkstraAlgo(graph, start, finish));
             }

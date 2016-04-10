@@ -29,11 +29,14 @@ namespace PudgeClient
             {
                 if (Movement.ApproximatelyEqual(old, data.SelfLocation, 2))
                 {
-                    data = client.Rotate(180);
+                    data = client.Rotate(90);
                     data = client.MoveByLine(data, 1, visited);
+                    data = client.Rotate(90);
+                    data = client.MoveByLine(data, 1, visited);
+
                     visited.Check(data.WorldTime);
                 }
-                if (!Movement.ApproximatelyEqual(data.SelfLocation, end, 5))
+                if (!Movement.ApproximatelyEqual(data.SelfLocation, end, 7))
                     return client.GoTo(data, end, visited);
             }
             return data;
