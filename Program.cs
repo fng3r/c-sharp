@@ -56,10 +56,10 @@ namespace PudgeClient
             // При изменении руны будут появляться в другом порядке
             // speedUp -- ускорение отладки в два раза. Может вызывать снижение FPS на слабых машинах
 
-            
-           
 
-            var sensorData = client.Configurate(ip, port, CvarcTag);
+
+
+            var sensorData = client.Configurate(ip, port, CvarcTag, operationalTimeLimit: 5);
 
             // Пудж узнает о всех событиях, происходящих в мире, с помощью сенсоров.
             // Для передачи и представления данных с сенсоров служат объекты класса PudgeSensorsData.
@@ -86,16 +86,6 @@ namespace PudgeClient
                         continue;
                     var greedyPath = greedyChoice.Path.Skip(1);
                     sensorData = PartWalking(sensorData, client, greedyPath, visited);
-                    //foreach (var node in greedyPath)
-                    //{
-                    //    visited.Check(sensorData.WorldTime);
-                    //    sensorData = client.GoTo(sensorData, node.Location, visited);
-                    //    if (sensorData.IsDead)
-                    //    {
-                    //        client.Wait(5);
-                    //        break;
-                    //    }
-                    //}
                     continue;
                 }
                 visited.Check(sensorData.WorldTime);
@@ -104,35 +94,23 @@ namespace PudgeClient
                 {
                     if (dataEvent.Event == PudgeEvent.Invisible || dataEvent.Event == PudgeEvent.Hasted)
                     {
-                        var choice1 = InvestigateWorld(sensorData, graph, specRunes, visited);
-                        if (choice1.PathLength == 0)
+                        var anotherChoice = InvestigateWorld(sensorData, graph, specRunes, visited);
+                        if (anotherChoice.PathLength == 0)
                             break;
                         var timeRemaining = dataEvent.Duration - (sensorData.WorldTime - dataEvent.Start);
-                        if (choice1.PathLength / 40 < timeRemaining)
+                        if (anotherChoice.PathLength / 40 < timeRemaining)
                         {
-                            choice = choice1;
+                            choice = anotherChoice;
                         }
                     }
                 }
                 var path = choice.Path.Skip(1);
                 if (path.Count() == 0)
                 {
-                    sensorData = client.Wait(0.01);
+                    sensorData = client.Wait(0.2);
                     continue;
                 }
-                //foreach (var node in path)
-                //{
-                //    visited.Check(sensorData.WorldTime);
-                //    sensorData = client.GoTo(sensorData, node.Location, visited);
-                //    if (sensorData.IsDead)
-                //    {
-                //        client.Wait(5);
-                //        break;
-                //    }
-
-                //}
                 sensorData = PartWalking(sensorData, client, path, visited);
-                
             }
 
             // Корректно завершаем работу
@@ -166,7 +144,7 @@ namespace PudgeClient
                 if (visited.HashSet.Contains(rune))
                     continue ;
                 var loc = data.SelfLocation;
-                var start = graph.Nodes.Where(x => Movement.ApproximatelyEqual(loc, x.Location, 10)).Single();
+                var start = graph.Nodes.Where(x => Movement.ApproximatelyEqual(loc, x.Location, 15)).Single();
                 var finish = graph.Nodes.Where(x => x.Location == rune).Single();
                 toGo.Add(PathFinder.DijkstraAlgo(graph, start, finish));
             }

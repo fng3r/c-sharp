@@ -11,46 +11,54 @@ namespace PudgeClient
 {
     static class PudgeClientLevel1Extensions
     {
+
+        public static IEnumerable<Point2D> Runes = PrepareForBattle.GetRunes();
+        public static IEnumerable<Point2D> SpecRunes = PrepareForBattle.GetSpecialRunes();
+
         public static PudgeSensorsData GoTo(this PudgeClientLevel1 client, PudgeSensorsData data, Point2D end, RuneHashSet visited)
         {
             var old = data.SelfLocation;
             var dx = end.X - data.SelfLocation.X;
             var dy = end.Y - data.SelfLocation.Y;
-            var rAngle = Movement.FindAngle(data, dx, dy);
             var distance = Math.Sqrt(dx * dx + dy * dy);
-            if (Math.Abs(rAngle) > 5)
+            var rAngle = Movement.FindAngle(data, dx, dy);
+            if (Math.Abs(rAngle) > 7)
                 data = client.Rotate(rAngle);
             data = MoveByLine(client, data, distance, visited);
             if (!data.IsDead)
-                if (Movement.ApproximatelyEqual(old, data.SelfLocation, 1))
+            {
+                if (Movement.ApproximatelyEqual(old, data.SelfLocation, 2))
                 {
-                    client.Rotate(180);
-                    data = client.Move(3);
+                    data = client.Rotate(180);
+                    data = client.MoveByLine(data, 1, visited);
                     visited.Check(data.WorldTime);
                 }
-                if (!Movement.ApproximatelyEqual(data.SelfLocation, end, 3))
+                if (!Movement.ApproximatelyEqual(data.SelfLocation, end, 5))
                     return client.GoTo(data, end, visited);
+            }
             return data;
         }
 
         public static PudgeSensorsData MoveByLine(this PudgeClientLevel1 client, PudgeSensorsData data, double distance, RuneHashSet visited)
         {
-            var step = distance / 10.0;
+            var step = distance / 3.0;
 
-            for (var i = 0; i < 10; i++)
+            for (var i = 0; i < 3; i++)
             {
                 data = client.Move(step);
                 visited.Check(data.WorldTime);
                 if (data.IsDead)
                     break;
-                checkSomething();
+                //if (data.Map.Runes.Count() == 1)
+                //{
+                //    var target = data.Map.Runes.Single();
+                //    var runes = PrepareForBattle.GetAllRunes();
+                //    var goTo = runes.Where(x => x == target.Location).Single();
+                //    return client.GoTo(data, goTo, visited);
+                //}
             }
             return data;
         }
 
-        public static void checkSomething()
-        {
-
-        }
     }
 }
