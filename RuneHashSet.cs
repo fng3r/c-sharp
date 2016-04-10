@@ -16,6 +16,16 @@ namespace PudgeClient
         {
             HashSet = new HashSet<Point2D>();
         }
+
+        public bool Contains(Point2D point)
+        {
+            return HashSet.Contains(point);
+        }
+
+        public void Add(Point2D point)
+        {
+            HashSet.Add(point);
+        }
         
         bool NeedToClear(double currentTime)
         {

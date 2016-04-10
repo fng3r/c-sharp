@@ -85,18 +85,17 @@ namespace PudgeClient
                     if (greedyChoice.PathLength == 0)
                         continue;
                     var greedyPath = greedyChoice.Path.Skip(1);
-                    foreach (var node in greedyPath)
-                    {
-                        visited.Check(sensorData.WorldTime);
-                        sensorData = client.GoTo(sensorData, node.Location, visited);
-                        if (sensorData.IsDead)
-                        {
-                            client.Wait(5);
-                            break;
-                        }
-                        visited.Add(central);
-                    }
-                    sensorData = client.Wait(0.1);
+                    sensorData = PartWalking(sensorData, client, greedyPath, visited);
+                    //foreach (var node in greedyPath)
+                    //{
+                    //    visited.Check(sensorData.WorldTime);
+                    //    sensorData = client.GoTo(sensorData, node.Location, visited);
+                    //    if (sensorData.IsDead)
+                    //    {
+                    //        client.Wait(5);
+                    //        break;
+                    //    }
+                    //}
                     continue;
                 }
                 visited.Check(sensorData.WorldTime);
@@ -121,23 +120,41 @@ namespace PudgeClient
                     sensorData = client.Wait(0.01);
                     continue;
                 }
-                foreach (var node in path)
-                {
-                    visited.Check(sensorData.WorldTime);
-                    sensorData = client.GoTo(sensorData, node.Location, visited);
-                    if (sensorData.IsDead)
-                    {
-                        client.Wait(5);
-                        break;
-                    }
+                //foreach (var node in path)
+                //{
+                //    visited.Check(sensorData.WorldTime);
+                //    sensorData = client.GoTo(sensorData, node.Location, visited);
+                //    if (sensorData.IsDead)
+                //    {
+                //        client.Wait(5);
+                //        break;
+                //    }
 
-                }
-                visited.HashSet.Add(path.Last().Location);
-                sensorData = client.Wait(0.3);
+                //}
+                sensorData = PartWalking(sensorData, client, path, visited);
+                
             }
 
             // Корректно завершаем работу
             //client.Exit();
+        }
+
+        public static PudgeSensorsData PartWalking(PudgeSensorsData data, PudgeClientLevel1 client, IEnumerable<Node> path, RuneHashSet visited)
+        {
+            foreach (var node in path)
+            {
+                visited.Check(data.WorldTime);
+                data = client.GoTo(data, node.Location, visited);
+                if (data.IsDead)
+                {
+                    data = client.Wait(5);
+                    return data;
+                }
+
+            }
+            visited.Add(path.Last().Location);
+            data = client.Wait(0.1);
+            return data;
         }
 
 
