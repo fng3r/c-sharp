@@ -79,7 +79,26 @@ namespace PudgeClient
             var central = new Point2D(0, 0);
             while (true)
             {
-
+                if (!visited.Contains(central))
+                {
+                    var greedyChoice = InvestigateWorld(sensorData, graph, new Point2D[] { central }, visited);
+                    if (greedyChoice.PathLength == 0)
+                        continue;
+                    var greedyPath = greedyChoice.Path.Skip(1);
+                    foreach (var node in greedyPath)
+                    {
+                        visited.Check(sensorData.WorldTime);
+                        sensorData = client.GoTo(sensorData, node.Location, visited);
+                        if (sensorData.IsDead)
+                        {
+                            client.Wait(5);
+                            break;
+                        }
+                        visited.Add(central);
+                    }
+                    sensorData = client.Wait(0.1);
+                    continue;
+                }
                 visited.Check(sensorData.WorldTime);
                 var choice = InvestigateWorld(sensorData, graph, runes, visited);
                 foreach (var dataEvent in sensorData.Events)
@@ -114,7 +133,7 @@ namespace PudgeClient
 
                 }
                 visited.HashSet.Add(path.Last().Location);
-                sensorData = client.Wait(0.05);
+                sensorData = client.Wait(0.3);
             }
 
             // Корректно завершаем работу
@@ -130,7 +149,7 @@ namespace PudgeClient
                 if (visited.HashSet.Contains(rune))
                     continue ;
                 var loc = data.SelfLocation;
-                var start = graph.Nodes.Where(x => Movement.ApproximatelyEqual(loc, x.Location, 5)).Single();
+                var start = graph.Nodes.Where(x => Movement.ApproximatelyEqual(loc, x.Location, 10)).Single();
                 var finish = graph.Nodes.Where(x => x.Location == rune).Single();
                 toGo.Add(PathFinder.DijkstraAlgo(graph, start, finish));
             }
