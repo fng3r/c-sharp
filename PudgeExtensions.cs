@@ -1,6 +1,7 @@
 ﻿using AIRLab.Mathematics;
 using Pudge;
 using Pudge.Player;
+using Pudge.Sensors.Map;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,21 +10,29 @@ using System.Threading.Tasks;
 
 namespace PudgeClient
 {
-    static class PudgeClientLevel1Extensions
+    static class PudgeClientLevel2Extensions
     {
 
         public static IEnumerable<Point2D> Runes = PrepareForBattle.GetRunes();
         public static IEnumerable<Point2D> SpecRunes = PrepareForBattle.GetSpecialRunes();
 
-        public static PudgeSensorsData GoTo(this PudgeClientLevel1 client, PudgeSensorsData data, Point2D end, RuneHashSet visited)
+
+        public static PudgeSensorsData RotateTo(this PudgeClientLevel2 client, PudgeSensorsData data, double dx, double dy)
+        {
+            var angle = Math.Atan2(dy, dx) * 180 / Math.PI;
+            var rAngle = (angle - data.SelfLocation.Angle) % 360;
+            if (Math.Abs(rAngle) > 180)
+                rAngle -= Math.Sign(rAngle) * 360;
+            return client.Rotate(rAngle); 
+        }
+
+        public static PudgeSensorsData GoTo(this PudgeClientLevel2 client, PudgeSensorsData data, Point2D end, RuneHashSet visited)
         {
             var old = data.SelfLocation;
             var dx = end.X - data.SelfLocation.X;
             var dy = end.Y - data.SelfLocation.Y;
             var distance = Math.Sqrt(dx * dx + dy * dy);
-            var rAngle = Movement.FindAngle(data, dx, dy);
-            if (Math.Abs(rAngle) > 7)
-                data = client.Rotate(rAngle);
+            data = client.RotateTo(data, dx, dy);            
             data = MoveByLine(client, data, distance, visited);
             if (!data.IsDead)
             {
@@ -42,25 +51,49 @@ namespace PudgeClient
             return data;
         }
 
-        public static PudgeSensorsData MoveByLine(this PudgeClientLevel1 client, PudgeSensorsData data, double distance, RuneHashSet visited)
+        public static PudgeSensorsData MoveByLine(this PudgeClientLevel2 client, PudgeSensorsData data, double distance, RuneHashSet visited)
         {
-            var step = distance / 3.0;
+            var step = distance / 5.0;
 
-            for (var i = 0; i < 3; i++)
+            for (var i = 0; i < 5; i++)
             {
-                data = client.Move(step);
-                visited.Check(data.WorldTime);
                 if (data.IsDead)
                     break;
-                //if (data.Map.Runes.Count() == 1)
-                //{
-                //    var target = data.Map.Runes.Single();
-                //    var runes = PrepareForBattle.GetAllRunes();
-                //    var goTo = runes.Where(x => x == target.Location).Single();
-                //    return client.GoTo(data, goTo, visited);
-                //}
+                if (CheckSlardar(data))
+                {
+                    if (!data.Events.Select(x => x.Event).Contains(Pudge.World.PudgeEvent.HookCooldown))
+                    {
+                        data = HookSmb(client, data);
+                        break;
+                    }
+                }
+                data = client.Move(step);
+                visited.Check(data.WorldTime);                               
             }
             return data;
+        }
+
+        public static PudgeSensorsData HookSmb(PudgeClientLevel2 client, PudgeSensorsData data)
+        {
+            //if (data.Events.Select(x => x.Event).Contains(Pudge.World.PudgeEvent.HookCooldown))
+            //    return data; 
+            var old = data.SelfLocation;
+            var heroData = data.Map.Heroes.Where(x => x.Type == HeroType.Slardar).Single(); 
+            var dx = heroData.Location.X - data.SelfLocation.X;
+            var dy = heroData.Location.Y - data.SelfLocation.Y;
+            data = client.RotateTo(data, dx, dy); 
+            data = client.Hook(); 
+            while(data.Events.Select(x => x.Event).Contains(Pudge.World.PudgeEvent.HookThrown))
+            {
+                data = client.Wait(0.1); 
+            }
+            return data; 
+        }
+
+
+        public static bool CheckSlardar(PudgeSensorsData data)
+        {
+            return data.Map.Heroes.Select(x => x.Type).Contains(Pudge.Sensors.Map.HeroType.Slardar); 
         }
 
     }

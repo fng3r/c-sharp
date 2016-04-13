@@ -45,7 +45,7 @@ namespace PudgeClient
 
 
             // Каждую неделю клиент будет новый. Соотетственно Level1, Level2 и Level3.
-            var client = new PudgeClientLevel1();
+            var client = new PudgeClientLevel2();
 
             // У этого метода так же есть необязательные аргументы:
             // timeLimit -- время в секундах, сколько будет идти матч (по умолчанию 90)
@@ -122,7 +122,7 @@ namespace PudgeClient
             //client.Exit();
         }
 
-        public static PudgeSensorsData PartWalking(PudgeSensorsData data, PudgeClientLevel1 client, IEnumerable<Node> path, RuneHashSet visited)
+        public static PudgeSensorsData PartWalking(PudgeSensorsData data, PudgeClientLevel2 client, IEnumerable<Node> path, RuneHashSet visited)
         {
             foreach (var node in path)
             {
