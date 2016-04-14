@@ -12,6 +12,7 @@ namespace PudgeClient
 {
     class Movement
     {
+<<<<<<< HEAD
         public static PudgeSensorsData GoTo(PudgeSensorsData data, PudgeClientLevel1 client, Point2D end)
         {
             var dx = end.X - data.SelfLocation.X;
@@ -54,6 +55,10 @@ namespace PudgeClient
         {
 
         }
+=======
+        
+        
+>>>>>>> refs/remotes/origin/master
 
         public static bool ApproximatelyEqual(LocatorItem self, Point2D loc, double deviation)
         {

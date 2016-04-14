@@ -16,6 +16,19 @@ namespace PudgeClient
         {
             HashSet = new HashSet<Point2D>();
         }
+<<<<<<< HEAD
+=======
+
+        public bool Contains(Point2D point)
+        {
+            return HashSet.Contains(point);
+        }
+
+        public void Add(Point2D point)
+        {
+            HashSet.Add(point);
+        }
+>>>>>>> refs/remotes/origin/master
         
         bool NeedToClear(double currentTime)
         {
