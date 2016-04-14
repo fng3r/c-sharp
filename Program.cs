@@ -59,7 +59,7 @@ namespace PudgeClient
 
 
 
-            var sensorData = client.Configurate(ip, port, CvarcTag, operationalTimeLimit: 1000);
+            var sensorData = client.Configurate(ip, port, CvarcTag, seed: 2);
 
             // Пудж узнает о всех событиях, происходящих в мире, с помощью сенсоров.
             // Для передачи и представления данных с сенсоров служат объекты класса PudgeSensorsData.
@@ -76,76 +76,58 @@ namespace PudgeClient
             var graph = PrepareForBattle.MakeGraph(points);
             var runes = PrepareForBattle.GetRunes();
             var specRunes = PrepareForBattle.GetSpecialRunes();
-            var visited = new RuneHashSet();
+            var visited = new RuneHashSet(25);
+            var killed = new RuneHashSet(15);
+            var slardarSpots = PrepareForBattle.GetSlardars();
             var central = new Point2D(0, 0);
-            //if (sensorData.SelfLocation.X < 0)
-            //    sensorData = client.GoTo(sensorData, new Point2D(-115, -115), visited);
-            //else
-            //    sensorData = client.GoTo(sensorData, new Point2D(115, 115), visited);
+
             while (true)
             {
-                //if (!visited.Contains(central))
-                //{
-                //    var greedyChoice = InvestigateWorld(sensorData, graph, new Point2D[] { central }, visited);
-                //    if (greedyChoice.PathLength == 0)
-                //        continue;
-                //    var greedyPath = greedyChoice.Path.Skip(1);
-                //    sensorData = PartWalking(sensorData, client, greedyPath, visited);
-                //    continue;
-                //}
-                visited.Check(sensorData.WorldTime);
-                var choice = InvestigateWorld(sensorData, graph, runes, visited);
-                foreach (var dataEvent in sensorData.Events)
+                var choices = new List<DijkstraAnswer>();
+                choices.Add(InvestigateWorld(sensorData, graph, new Point2D[] { central }, visited));
+                choices.Add(InvestigateWorld(sensorData, graph, slardarSpots, killed));
+                choices.Add(InvestigateWorld(sensorData, graph, specRunes, visited));
+                var chosen = InvestigateWorld(sensorData, graph, runes, visited);
+                if (choices.Any(x => x.PathLength != 0))
                 {
-                    if (dataEvent.Event == PudgeEvent.Invisible || dataEvent.Event == PudgeEvent.Hasted)
-                    {
-                        var anotherChoice = InvestigateWorld(sensorData, graph, specRunes, visited);
-                        if (anotherChoice.PathLength == 0)
-                            break;
-                        var timeRemaining = dataEvent.Duration - (sensorData.WorldTime - dataEvent.Start);
-                        if (anotherChoice.PathLength / 40 < timeRemaining)
-                        {
-                            choice = anotherChoice;
-                        }
-                    }
+                    var min = choices.Where(x => x.PathLength != 0).Min(x => x.PathLength);
+                    chosen = choices.Where(x => x.PathLength == min).Single();
                 }
-                var path = choice.Path.Skip(1);
+                var path = chosen.Path.Skip(1);
                 if (path.Count() == 0)
                 {
                     sensorData = client.Wait(0.2);
                     continue;
                 }
-                sensorData = PartWalking(sensorData, client, path, visited);
+                sensorData = PartWalking(sensorData, client, path, visited, killed);
             }
 
             // Корректно завершаем работу
             //client.Exit();
         }
 
-        public static PudgeSensorsData PartWalking(PudgeSensorsData data, PudgeClientLevel2 client, IEnumerable<Node> path, RuneHashSet visited)
+        public static PudgeSensorsData PartWalking(PudgeSensorsData data, PudgeClientLevel2 client, IEnumerable<Node> path, RuneHashSet visited, RuneHashSet killed)
         {
-            
             foreach (var node in path)
             {
-                var targetPoint = path.Last();
                 visited.Check(data.WorldTime);
-                var previousScore = data.SelfScores; 
-                data = client.GoTo(data, node.Location, visited, targetPoint.Location);
-                if (data.SelfScores > previousScore &&
-                    !data.Events.Select(x => x.Event).Contains(Pudge.World.PudgeEvent.HookCooldown)
-                    && node != targetPoint)
-                {
-                    visited.Add(node.Location);
-                }
+                killed.Check(data.WorldTime);
+                data = client.GoTo(data, node.Location, visited, killed);
                 if (data.IsDead)
                 {
-                    data = client.Wait(5);
+                    for (int i = 0; i < 5; i++)
+                    {
+                        data = client.Wait(1);
+                        visited.Check(data.WorldTime);
+                        killed.Check(data.WorldTime);
+                    }
                     return data;
                 }
 
             }
-            visited.Add(path.Last().Location);
-            data = client.Wait(0.15);
+            var destination = path.Last().Location;
+            visited.Add(destination);
+            data = client.Wait(0.1);
             return data;
         }
 
@@ -158,7 +140,8 @@ namespace PudgeClient
                 if (visited.HashSet.Contains(rune))
                     continue ;
                 var loc = data.SelfLocation;
-                var start = graph.Nodes.Where(x => Movement.ApproximatelyEqual(loc, x.Location, 20)).Single();
+                var minimal = graph.Nodes.Select(x => Movement.GetDistance(x.Location, loc)).Min();
+                var start = graph.Nodes.Where(x => Movement.GetDistance(x.Location, loc) == minimal).Single() ;
                 var finish = graph.Nodes.Where(x => x.Location == rune).Single();
                 toGo.Add(PathFinder.DijkstraAlgo(graph, start, finish));
             }
@@ -170,3 +153,183 @@ namespace PudgeClient
         }
     }
 }
+
+#region Trees
+//double[][] Trees = new double[][] {
+//                new double[3] {-160.0, 160.0, 0.0 },
+//                new double[3] { -150.0, 160.0, 0.0 },
+//                new double[3] { -140.0, 160.0, 0.0 },
+//                new double[3] { -130.0, 160.0, 0.0 },
+//                new double[3] { -120.0, 160.0, 0.0 },
+//                new double[3] { -110.0, 160.0, 0.0 },
+//                new double[3] { -100.0, 160.0, 0.0 },
+//                new double[3] { -90.0, 160.0, 0.0 },
+//                new double[3] { -80.0, 160.0, 0.0 },
+//                new double[3] { -70.0, 160.0, 0.0 },
+//                new double[3] { -60.0, 160.0, 0.0 },
+//                new double[3] { -50.0, 160.0, 0.0 },
+//                new double[3] { -40.0, 160.0, 0.0 },
+//                new double[3] { -30.0, 160.0, 0.0 },
+//                new double[3] { -20.0, 160.0, 0.0 },
+//                new double[3] { -10.0, 160.0, 0.0 },
+//                new double[3] { 0.0, 160.0, 0.0 },
+//                new double[3] { 10.0, 160.0, 0.0 },
+//                new double[3] { 20.0, 160.0, 0.0 },
+//                new double[3] { 30.0, 160.0, 0.0 },
+//                new double[3] { 40.0, 160.0, 0.0 },
+//                new double[3] { 50.0, 160.0, 0.0 },
+//                new double[3] { 60.0, 160.0, 0.0 },
+//                new double[3] { 70.0, 160.0, 0.0 },
+//                new double[3] { 80.0, 160.0, 0.0 },
+//                new double[3] { 90.0, 160.0, 0.0 },
+//                new double[3] { 100.0, 160.0, 0.0 },
+//                new double[3] { 110.0, 160.0, 0.0 },
+//                new double[3] { 120.0, 160.0, 0.0 },
+//                new double[3] { 130.0, 160.0, 0.0 },
+//                new double[3] { 140.0, 160.0, 0.0 },
+//                new double[3] { 150.0, 160.0, 0.0 },
+//                new double[3] { -160.0, 160.0, 0.0 },
+//                new double[3] { -160.0, 150.0, 0.0 },
+//                new double[3] { -160.0, 140.0, 0.0 },
+//                new double[3] { -160.0, 130.0, 0.0 },
+//                new double[3] { -160.0, 120.0, 0.0 },
+//                new double[3] { -160.0, 110.0, 0.0 },
+//                new double[3] { -160.0, 100.0, 0.0 },
+//                new double[3] { -160.0, 90.0, 0.0 },
+//                new double[3] { -160.0, 80.0, 0.0 },
+//                new double[3] { -160.0, 70.0, 0.0 },
+//                new double[3] { -160.0, 60.0, 0.0 },
+//                new double[3] { -160.0, 50.0, 0.0 },
+//                new double[3] { -160.0, 40.0, 0.0 },
+//                new double[3] { -160.0, 30.0, 0.0 },
+//                new double[3] { -160.0, 20.0, 0.0 },
+//                new double[3] { -160.0, 10.0, 0.0 },
+//                new double[3] { -160.0, 0.0, 0.0 },
+//                new double[3] { -160.0, -10.0, 0.0 },
+//                new double[3] { -160.0, -20.0, 0.0 },
+//                new double[3] { -160.0, -30.0, 0.0 },
+//                new double[3] { -160.0, -40.0, 0.0 },
+//                new double[3] { -160.0, -50.0, 0.0 },
+//                new double[3] { -160.0, -60.0, 0.0 },
+//                new double[3] { -160.0, -70.0, 0.0 },
+//                new double[3] { -160.0, -80.0, 0.0 },
+//                new double[3] { -160.0, -90.0, 0.0 },
+//                new double[3] { -160.0, -100.0, 0.0 },
+//                new double[3] { -160.0, -110.0, 0.0 },
+//                new double[3] { -160.0, -120.0, 0.0 },
+//                new double[3] { -160.0, -130.0, 0.0 },
+//                new double[3] { -160.0, -140.0, 0.0 },
+//                new double[3] { -160.0, -150.0, 0.0 },
+//                new double[3] { 160.0, -160.0, 0.0 },
+//                new double[3] { 150.0, -160.0, 0.0 },
+//                new double[3] { 140.0, -160.0, 0.0 },
+//                new double[3] { 130.0, -160.0, 0.0 },
+//                new double[3] { 120.0, -160.0, 0.0 },
+//                new double[3] { 110.0, -160.0, 0.0 },
+//                new double[3] { 100.0, -160.0, 0.0 },
+//                new double[3] { 90.0, -160.0, 0.0 },
+//                new double[3] { 80.0, -160.0, 0.0 },
+//                new double[3] { 70.0, -160.0, 0.0 },
+//                new double[3] { 60.0, -160.0, 0.0 },
+//                new double[3] { 50.0, -160.0, 0.0 },
+//                new double[3] { 40.0, -160.0, 0.0 },
+//                new double[3] { 30.0, -160.0, 0.0 },
+//                new double[3] { 20.0, -160.0, 0.0 },
+//                new double[3] { 10.0, -160.0, 0.0 },
+//                new double[3] { 0.0, -160.0, 0.0 },
+//                new double[3] { -10.0, -160.0, 0.0 },
+//                new double[3] { -20.0, -160.0, 0.0 },
+//                new double[3] { -30.0, -160.0, 0.0 },
+//                new double[3] { -40.0, -160.0, 0.0 },
+//                new double[3] { -50.0, -160.0, 0.0 },
+//                new double[3] { -60.0, -160.0, 0.0 },
+//                new double[3] { -70.0, -160.0, 0.0 },
+//                new double[3] { -80.0, -160.0, 0.0 },
+//                new double[3] { -90.0, -160.0, 0.0 },
+//                new double[3] { -100.0, -160.0, 0.0 },
+//                new double[3] { -110.0, -160.0, 0.0 },
+//                new double[3] { -120.0, -160.0, 0.0 },
+//                new double[3] { -130.0, -160.0, 0.0 },
+//                new double[3] { -140.0, -160.0, 0.0 },
+//                new double[3] { -150.0, -160.0, 0.0 },
+//                new double[3] { 160.0, -160.0, 0.0 },
+//                new double[3] { 160.0, -150.0, 0.0 },
+//                new double[3] { 160.0, -140.0, 0.0 },
+//                new double[3] { 160.0, -130.0, 0.0 },
+//                new double[3] { 160.0, -120.0, 0.0 },
+//                new double[3] { 160.0, -110.0, 0.0 },
+//                new double[3] { 160.0, -100.0, 0.0 },
+//                new double[3] { 160.0, -90.0, 0.0 },
+//                new double[3] { 160.0, -80.0, 0.0 },
+//                new double[3] { 160.0, -70.0, 0.0 },
+//                new double[3] { 160.0, -60.0, 0.0 },
+//                new double[3] { 160.0, -50.0, 0.0 },
+//                new double[3] { 160.0, -40.0, 0.0 },
+//                new double[3] { 160.0, -30.0, 0.0 },
+//                new double[3] { 160.0, -20.0, 0.0 },
+//                new double[3] { 160.0, -10.0, 0.0 },
+//                new double[3] { 160.0, 0.0, 0.0 },
+//                new double[3] { 160.0, 10.0, 0.0 },
+//                new double[3] { 160.0, 20.0, 0.0 },
+//                new double[3] { 160.0, 30.0, 0.0 },
+//                new double[3] { 160.0, 40.0, 0.0 },
+//                new double[3] { 160.0, 50.0, 0.0 },
+//                new double[3] { 160.0, 60.0, 0.0 },
+//                new double[3] { 160.0, 70.0, 0.0 },
+//                new double[3] { 160.0, 80.0, 0.0 },
+//                new double[3] { 160.0, 90.0, 0.0 },
+//                new double[3] { 160.0, 100.0, 0.0 },
+//                new double[3] { 160.0, 110.0, 0.0 },
+//                new double[3] { 160.0, 120.0, 0.0 },
+//                new double[3] { 160.0, 130.0, 0.0 },
+//                new double[3] { 160.0, 140.0, 0.0 },
+//                new double[3] { 160.0, 150.0, 0.0 },
+//                new double[3] { 140.0, -80.0, 0.0 },
+//                new double[3] { 130.0, -80.0, 0.0 },
+//                new double[3] { 120.0, -80.0, 0.0 },
+//                new double[3] { 80.0, -140.0, 0.0 },
+//                new double[3] { 80.0, -130.0, 0.0 },
+//                new double[3] { 80.0, -120.0, 0.0 },
+//                new double[3] { -140.0, 80.0, 0.0 },
+//                new double[3] { -130.0, 80.0, 0.0 },
+//                new double[3] { -120.0, 80.0, 0.0 },
+//                new double[3] { -80.0, 140.0, 0.0 },
+//                new double[3] { -80.0, 130.0, 0.0 },
+//                new double[3] { -80.0, 120.0, 0.0 },
+//                new double[3] { -100.0, -100.0, 0.0 },
+//                new double[3] { -90.0, -90.0, 0.0 },
+//                new double[3] { -80.0, -80.0, 0.0 },
+//                new double[3] { -100.0, -30.0, 0.0 },
+//                new double[3] { -90.0, -40.0, 0.0 },
+//                new double[3] { -80.0, -50.0, 0.0 },
+//                new double[3] { -70.0, -60.0, 0.0 },
+//                new double[3] { -60.0, -70.0, 0.0 },
+//                new double[3] { -50.0, -80.0, 0.0 },
+//                new double[3] { -40.0, -90.0, 0.0 },
+//                new double[3] { -30.0, -100.0, 0.0 },
+//                new double[3] { 100.0, 100.0, 0.0 },
+//                new double[3] { 90.0, 90.0, 0.0 },
+//                new double[3] { 80.0, 80.0, 0.0 },
+//                new double[3] { 100.0, 30.0, 0.0 },
+//                new double[3] { 90.0, 40.0, 0.0 },
+//                new double[3] { 80.0, 50.0, 0.0 },
+//                new double[3] { 70.0, 60.0, 0.0 },
+//                new double[3] { 60.0, 70.0, 0.0 },
+//                new double[3] { 50.0, 80.0, 0.0 },
+//                new double[3] { 40.0, 90.0, 0.0 },
+//                new double[3] { 30.0, 100.0, 0.0 },
+//                new double[3] { 80.0, -40.0, 0.0 },
+//                new double[3] { 70.0, -50.0, 0.0 },
+//                new double[3] { 60.0, -50.0, 0.0 },
+//                new double[3] { 50.0, -60.0, 0.0 },
+//                new double[3] { 40.0, -60.0, 0.0 },
+//                new double[3] { 30.0, -70.0, 0.0 },
+//                new double[3] { -80.0, 40.0, 0.0 },
+//                new double[3] { -70.0, 50.0, 0.0 },
+//                new double[3] { -60.0, 50.0, 0.0 },
+//                new double[3] { -50.0, 60.0, 0.0 },
+//                new double[3] { -40.0, 60.0, 0.0 },
+//                new double[3] { -30.0, 70.0, 0.0 },
+//                new double[3] {  -40.0, 0.0, 0.0 },
+//                new double[3] { 40.0, 0.0, 0.0 }};
+#endregion

@@ -2,138 +2,114 @@
 using Pudge;
 using Pudge.Player;
 using Pudge.Sensors.Map;
+using Pudge.World;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace PudgeClient
 {
+
     static class PudgeClientLevel2Extensions
     {
-
-        public static IEnumerable<Point2D> Runes = PrepareForBattle.GetRunes();
-        public static IEnumerable<Point2D> SpecRunes = PrepareForBattle.GetSpecialRunes();
-        public static bool isMoving;
-        public static Point2D startPoint;
-
+        public static bool OnMove = false;
+        public static IEnumerable<Point2D> SlardarSpots = PrepareForBattle.GetSlardars();
+        public static IEnumerable<Point2D> Points = PrepareForBattle.GetPoints();
+        
         public static PudgeSensorsData RotateTo(this PudgeClientLevel2 client, PudgeSensorsData data, double dx, double dy)
         {
             var angle = Math.Atan2(dy, dx) * 180 / Math.PI;
             var rAngle = (angle - data.SelfLocation.Angle) % 360;
             if (Math.Abs(rAngle) > 180)
                 rAngle -= Math.Sign(rAngle) * 360;
-            return client.Rotate(rAngle); 
+            return client.Rotate(rAngle); ;
         }
-
-        public static PudgeSensorsData GoTo(this PudgeClientLevel2 client, PudgeSensorsData data, Point2D end, 
-            RuneHashSet visited, Point2D targetPoint)
+        public static PudgeSensorsData GoTo(this PudgeClientLevel2 client, PudgeSensorsData data, Point2D end, RuneHashSet visited, RuneHashSet killed)
         {
             var old = data.SelfLocation;
             var dx = end.X - data.SelfLocation.X;
             var dy = end.Y - data.SelfLocation.Y;
-            var distance = Math.Sqrt(dx * dx + dy * dy);
+            var distance = Movement.GetDistance(dx, dy);
             data = client.RotateTo(data, dx, dy);
-            //var startPoint = new Point2D();
-            //double oldAngle;
-            //var oldLocation = Tuple.Create(startPoint, 0.0); 
-            if (!isMoving)
-            {
-                startPoint = new Point2D(data.SelfLocation.X, data.SelfLocation.Y);                
-            }
-            data = MoveByLine(client, data, distance, visited, targetPoint, startPoint);
-
+            data = MoveByLine(client, data, distance, visited, killed);
             if (!data.IsDead)
             {
                 if (Movement.ApproximatelyEqual(old, data.SelfLocation, 2))
                 {
-                    for (var i = 0; i < 2; i++)
+                    for (int i = 0; i < 1; i++)
                     {
-                        data = client.Rotate(90);
-                        data = client.MoveByLine(data, 1, visited, targetPoint, startPoint);
+                        data = client.Rotate(180);
+                        data = client.MoveByLine(data, 3, visited, killed);
                     }
-
                     visited.Check(data.WorldTime);
+                    killed.Check(data.WorldTime);
                 }
-
-                if (!Movement.ApproximatelyEqual(data.SelfLocation, end, 2))
-                    return client.GoTo(data, end, visited, targetPoint);
+                if (!Movement.ApproximatelyEqual(data.SelfLocation, end, 7))
+                    return client.GoTo(data, end, visited, killed);
             }
             return data;
         }
 
-        public static PudgeSensorsData MoveByLine(this PudgeClientLevel2 client, PudgeSensorsData data, double distance, 
-            RuneHashSet visited, Point2D targetPoint, Point2D oldLocation)
+        public static PudgeSensorsData MoveByLine(this PudgeClientLevel2 client, PudgeSensorsData data, double distance, RuneHashSet visited, RuneHashSet killed)
         {
-            var step = distance / 7.0;
-            
-            for (var i = 0; i < 7; i++)
+            var step = distance / 10;
+
+            for (var i = 0; i < 10; i++)
             {
                 if (data.IsDead)
                     break;
-
-                if (CheckSlardar(data))
-                {
-                    if (!data.Events.Select(x => x.Event).Contains(Pudge.World.PudgeEvent.HookCooldown))
+                if (CheckEnemy(data))
+                    if (!data.Events.Select(x => x.Event).Contains(PudgeEvent.HookCooldown))
                     {
-                        data = HookSmb(client, data);
+                        killed.Add(SlardarSpots.Where(x => Movement.ApproximatelyEqual(data.SelfLocation, x, 100)).Single());
+                        data = HookEnemy(client, data);
                         break;
                     }
-                }
-
-                 
+#region MaybeNextTime
+                //if (CheckRune(data))
+                //    if (!OnMove)
+                //    {
+                //        var loc = data.Map.Runes.First().Location;
+                //        var min = Points.Select(x => Movement.GetDistance(x, data.SelfLocation)).Min();
+                //        var toGo = Points.Where(x => Movement.GetDistance(x, data.SelfLocation) == min).First();
+                //        OnMove = !OnMove;
+                //        data = client.GoTo(data, toGo, visited);
+                //        data = client.GoTo(data, loc, visited);
+                //        visited.Add(loc);
+                //        OnMove = !OnMove;
+                //        break;
+                //    }
+                #endregion
                 data = client.Move(step);
-
-                var runeLocation = new Point2D(); 
-                if (data.Map.Runes.Count != 0)
-                    runeLocation = data.Map.Runes.First().Location;
-                if (CheckRune(data) && !isMoving)
-                    {
-                        if (runeLocation != targetPoint)
-                            {
-                                isMoving = !isMoving;
-                                data = client.GoTo(data, runeLocation, visited, targetPoint);
-                                visited.Add(runeLocation);
-                                
-                                data = client.GoTo(data, oldLocation, visited, targetPoint);
-                                isMoving = !isMoving;
-                                break;
-                            }
-                    }
-                
-                visited.Check(data.WorldTime);                               
+                visited.Check(data.WorldTime);
+                killed.Check(data.WorldTime);
             }
+
             return data;
         }
 
-        public static PudgeSensorsData HookSmb(PudgeClientLevel2 client, PudgeSensorsData data)
+        public static bool CheckEnemy(PudgeSensorsData data)
         {
-            //if (data.Events.Select(x => x.Event).Contains(Pudge.World.PudgeEvent.HookCooldown))
-            //    return data; 
-            var old = data.SelfLocation;
-            var heroData = data.Map.Heroes.Where(x => x.Type == HeroType.Slardar).Single(); 
-            var dx = heroData.Location.X - data.SelfLocation.X;
-            var dy = heroData.Location.Y - data.SelfLocation.Y;
-            data = client.RotateTo(data, dx, dy); 
-            data = client.Hook();
-            //data = client.Wait(1); 
-            while(data.Events.Select(x => x.Event).Contains(Pudge.World.PudgeEvent.HookThrown))
-            {
-                data = client.Wait(0.1); 
-            }
-            return data; 
-        }
-
-
-        public static bool CheckSlardar(PudgeSensorsData data)
-        {
-            return data.Map.Heroes.Select(x => x.Type).Contains(Pudge.Sensors.Map.HeroType.Slardar); 
+            return data.Map.Heroes.Select(x => x.Type).Contains(HeroType.Slardar);
         }
 
         public static bool CheckRune(PudgeSensorsData data)
         {
-            return data.Map.Runes.Count != 0; 
+            return data.Map.Runes.Count != 0;
         }
+
+        public static PudgeSensorsData HookEnemy(PudgeClientLevel2 client, PudgeSensorsData data)
+        {
+            var old = data.SelfLocation;
+            var heroData = data.Map.Heroes.Where(x => x.Type == HeroType.Slardar).Single();
+            var dx = heroData.Location.X - data.SelfLocation.X;
+            var dy = heroData.Location.Y - data.SelfLocation.Y;
+            data = client.RotateTo(data, dx, dy);
+            data = client.Hook();
+            while (data.Events.Select(x => x.Event).Contains(PudgeEvent.HookThrown))
+                data = client.Wait(0.05);
+            return data;
+        }
+
     }
 }

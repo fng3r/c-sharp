@@ -12,8 +12,18 @@ namespace PudgeClient
 {
     class Movement
     {
-        
-        
+
+        public static double GetDistance(double dx, double dy)
+        {
+            return Math.Sqrt(dx * dx + dy * dy);
+        }
+
+        public static double GetDistance(Point2D p, LocatorItem self)
+        {
+            var dx = p.X - self.X;
+            var dy = p.Y - self.Y;
+            return GetDistance(dx, dy);
+        }
 
         public static bool ApproximatelyEqual(LocatorItem self, Point2D loc, double deviation)
         {
