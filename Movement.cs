@@ -13,6 +13,15 @@ namespace PudgeClient
     class Movement
     {
 
+        public static double FindAngle(PudgeSensorsData data, double dx, double dy)
+        {
+            var angle = Math.Atan2(dy, dx) * 180 / Math.PI;
+            var rAngle = (angle - data.SelfLocation.Angle) % 360;
+            if (Math.Abs(rAngle) > 180)
+                rAngle -= Math.Sign(rAngle) * 360;
+            return rAngle;
+        }
+
         public static double GetDistance(double dx, double dy)
         {
             return Math.Sqrt(dx * dx + dy * dy);

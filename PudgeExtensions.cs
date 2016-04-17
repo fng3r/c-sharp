@@ -12,19 +12,16 @@ namespace PudgeClient
 
     static class PudgeClientLevel2Extensions
     {
-        public static bool OnMove = false;
+        public static bool AfterHook = false;
         public static IEnumerable<Point2D> SlardarSpots = PrepareForBattle.GetSlardars();
         public static IEnumerable<Point2D> Points = PrepareForBattle.GetPoints();
         
         public static PudgeSensorsData RotateTo(this PudgeClientLevel2 client, PudgeSensorsData data, double dx, double dy)
         {
-            var angle = Math.Atan2(dy, dx) * 180 / Math.PI;
-            var rAngle = (angle - data.SelfLocation.Angle) % 360;
-            if (Math.Abs(rAngle) > 180)
-                rAngle -= Math.Sign(rAngle) * 360;
-            return client.Rotate(rAngle); ;
+            var angle = Movement.FindAngle(data, dx, dy);
+            return client.Rotate(angle);
         }
-        public static PudgeSensorsData GoTo(this PudgeClientLevel2 client, PudgeSensorsData data, Point2D end, RuneHashSet visited, RuneHashSet killed)
+        public static PudgeSensorsData GoTo(this PudgeClientLevel2 client, PudgeSensorsData data, Point2D end, WorldInfo visited, WorldInfo killed)
         {
             var old = data.SelfLocation;
             var dx = end.X - data.SelfLocation.X;
@@ -34,27 +31,31 @@ namespace PudgeClient
             data = MoveByLine(client, data, distance, visited, killed);
             if (!data.IsDead)
             {
-                if (Movement.ApproximatelyEqual(old, data.SelfLocation, 2))
+                if (!AfterHook && Movement.ApproximatelyEqual(old, data.SelfLocation, 2))
                 {
                     for (int i = 0; i < 1; i++)
                     {
                         data = client.Rotate(180);
-                        data = client.MoveByLine(data, 3, visited, killed);
+                        data = client.MoveByLine(data, 10, visited, killed);
+                        data = client.Rotate(-90);
+                        data = client.MoveByLine(data, 7, visited, killed);
                     }
                     visited.Check(data.WorldTime);
                     killed.Check(data.WorldTime);
                 }
+                AfterHook = false;
                 if (!Movement.ApproximatelyEqual(data.SelfLocation, end, 7))
                     return client.GoTo(data, end, visited, killed);
             }
             return data;
         }
 
-        public static PudgeSensorsData MoveByLine(this PudgeClientLevel2 client, PudgeSensorsData data, double distance, RuneHashSet visited, RuneHashSet killed)
+        public static PudgeSensorsData MoveByLine(this PudgeClientLevel2 client, PudgeSensorsData data, double distance, WorldInfo visited, WorldInfo killed) 
         {
-            var step = distance / 10;
+            var count = (int)Math.Ceiling(distance / 2);
+            var step = distance / 7;
 
-            for (var i = 0; i < 10; i++)
+            for (var i = 0; i < 5; i++)
             {
                 if (data.IsDead)
                     break;
@@ -90,7 +91,7 @@ namespace PudgeClient
 
         public static bool CheckEnemy(PudgeSensorsData data)
         {
-            return data.Map.Heroes.Select(x => x.Type).Contains(HeroType.Slardar);
+            return data.Map.Heroes.Count() != 0;
         }
 
         public static bool CheckRune(PudgeSensorsData data)
@@ -101,11 +102,14 @@ namespace PudgeClient
         public static PudgeSensorsData HookEnemy(PudgeClientLevel2 client, PudgeSensorsData data)
         {
             var old = data.SelfLocation;
-            var heroData = data.Map.Heroes.Where(x => x.Type == HeroType.Slardar).Single();
-            var dx = heroData.Location.X - data.SelfLocation.X;
-            var dy = heroData.Location.Y - data.SelfLocation.Y;
-            data = client.RotateTo(data, dx, dy);
+            var enemy = data.Map.Heroes.Where(x => x.Type == HeroType.Slardar).Single();
+            var dx = enemy.Location.X - data.SelfLocation.X + Math.Cos(enemy.Angle) * 5;
+            var dy = enemy.Location.Y - data.SelfLocation.Y + Math.Sin(enemy.Angle) * 5;
+            var angle = Movement.FindAngle(data, dx, dy);
+            data = client.Rotate(angle);
             data = client.Hook();
+            AfterHook = !AfterHook;
+            data = client.Rotate(-angle);
             while (data.Events.Select(x => x.Event).Contains(PudgeEvent.HookThrown))
                 data = client.Wait(0.05);
             return data;

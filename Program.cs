@@ -59,11 +59,11 @@ namespace PudgeClient
 
 
 
-            var sensorData = client.Configurate(ip, port, CvarcTag, seed: 2);
+            var data = client.Configurate(ip, port, CvarcTag, seed: 0, operationalTimeLimit: 5);
 
             // Пудж узнает о всех событиях, происходящих в мире, с помощью сенсоров.
-            // Для передачи и представления данных с сенсоров служат объекты класса PudgeSensorsData.
-            Print(sensorData);
+            // Для передачи и представления данных с сенсоров служат объекты класса PudgeSensoвс rsData.
+            Print(data);
 
             // Каждое действие возвращает новые данные с сенсоров.
 
@@ -72,52 +72,88 @@ namespace PudgeClient
             // С этого момента любое действие приведет к отображению в консоли всех данных
             client.SensorDataReceived += Print;
 
+            var rules = PudgeRules.Current;
             var points = PrepareForBattle.GetPoints();
             var graph = PrepareForBattle.MakeGraph(points);
             var runes = PrepareForBattle.GetRunes();
             var specRunes = PrepareForBattle.GetSpecialRunes();
-            var visited = new RuneHashSet(25);
-            var killed = new RuneHashSet(15);
+            var visited = new WorldInfo(rules.RuneRespawnTime);
+            var killed = new WorldInfo(rules.SlardarRespawnTime);
             var slardarSpots = PrepareForBattle.GetSlardars();
             var central = new Point2D(0, 0);
 
             while (true)
             {
                 var choices = new List<DijkstraAnswer>();
-                choices.Add(InvestigateWorld(sensorData, graph, new Point2D[] { central }, visited));
-                choices.Add(InvestigateWorld(sensorData, graph, slardarSpots, killed));
-                choices.Add(InvestigateWorld(sensorData, graph, specRunes, visited));
-                var chosen = InvestigateWorld(sensorData, graph, runes, visited);
+                choices.Add(InvestigateWorld(data, graph, new Point2D[] { central }, visited));
+                choices.Add(InvestigateWorld(data, graph, slardarSpots, killed));
+                var specPath = (InvestigateWorld(data, graph, specRunes, visited));
+                choices.Add(specPath);
+                var chosen = InvestigateWorld(data, graph, runes, visited);
                 if (choices.Any(x => x.PathLength != 0))
                 {
                     var min = choices.Where(x => x.PathLength != 0).Min(x => x.PathLength);
                     chosen = choices.Where(x => x.PathLength == min).Single();
                 }
+                var slCD = killed.GetCooldown(data.WorldTime);
+                if (slCD < 5)
+                {
+                    var nearest = slardarSpots.Where(x => Movement.ApproximatelyEqual(data.SelfLocation, x, 50)).SingleOrDefault();
+                    var hookCD = double.Epsilon;
+                    if (nearest != default(Point2D))
+                    {
+                        foreach (var eventData in data.Events)
+                        {
+                            if (eventData.Event == PudgeEvent.HookCooldown)
+                            {
+                                hookCD = eventData.Duration - (data.WorldTime - eventData.Start);
+                                break;
+                            }
+                        }
+                        if (hookCD < slCD)
+                        {
+                            client.GoTo(data, nearest, visited, killed);
+                            var dist = Movement.GetDistance(nearest, data.SelfLocation);
+                            client.Wait(slCD - dist / rules.MovementVelocity - 0.5);
+                        }
+                    }
+                    else
+                    {
+                        foreach (var eventData in data.Events)
+                        {
+                            if (eventData.Event == PudgeEvent.HookCooldown)
+                            {
+                                hookCD = eventData.Duration - (data.WorldTime - eventData.Start);
+                                break;
+                            }
+                        }
+                        if (hookCD < 3 && specPath.PathLength == 0)
+                        chosen = InvestigateWorld(data, graph, slardarSpots, new WorldInfo(0));
+                    }
+                        
+                }
+                
                 var path = chosen.Path.Skip(1);
                 if (path.Count() == 0)
                 {
-                    sensorData = client.Wait(0.2);
+                    data = client.Wait(0.2);
                     continue;
                 }
-                sensorData = PartWalking(sensorData, client, path, visited, killed);
+                data = PartWalking(data, client, path, visited, killed);
             }
-
-            // Корректно завершаем работу
-            //client.Exit();
         }
 
-        public static PudgeSensorsData PartWalking(PudgeSensorsData data, PudgeClientLevel2 client, IEnumerable<Node> path, RuneHashSet visited, RuneHashSet killed)
-        {
-            foreach (var node in path)
+        public static PudgeSensorsData PartWalking(PudgeSensorsData data, PudgeClientLevel2 client, IEnumerable<Node> path, WorldInfo visited, WorldInfo killed)
+        {            foreach (var node in path)
             {
                 visited.Check(data.WorldTime);
                 killed.Check(data.WorldTime);
                 data = client.GoTo(data, node.Location, visited, killed);
                 if (data.IsDead)
                 {
-                    for (int i = 0; i < 5; i++)
+                    for (int i = 0; i < 1; i++)
                     {
-                        data = client.Wait(1);
+                        data = client.Wait(PudgeRules.Current.PudgeRespawnTime);
                         visited.Check(data.WorldTime);
                         killed.Check(data.WorldTime);
                     }
@@ -132,7 +168,7 @@ namespace PudgeClient
         }
 
 
-        public static DijkstraAnswer InvestigateWorld(PudgeSensorsData data, Graph graph, IEnumerable<Point2D> runes, RuneHashSet visited)
+        public static DijkstraAnswer InvestigateWorld(PudgeSensorsData data, Graph graph, IEnumerable<Point2D> runes, WorldInfo visited)
         {
             var toGo = new List<DijkstraAnswer>();
             foreach (var rune in runes)
@@ -143,11 +179,12 @@ namespace PudgeClient
                 var minimal = graph.Nodes.Select(x => Movement.GetDistance(x.Location, loc)).Min();
                 var start = graph.Nodes.Where(x => Movement.GetDistance(x.Location, loc) == minimal).Single() ;
                 var finish = graph.Nodes.Where(x => x.Location == rune).Single();
-                toGo.Add(PathFinder.DijkstraAlgo(graph, start, finish));
+                if (start != finish)
+                    toGo.Add(PathFinder.DijkstraAlgo(graph, start, finish));
             }
 
             if (toGo.Count == 0) return new DijkstraAnswer(new List<Node>(), 0);
-            var min = toGo.Where(x => x.PathLength != 0).Select(x => x.PathLength).Min();
+            var min = toGo.Select(x => x.PathLength).Min();
             var choice = toGo.Where(x => x.PathLength == min).First();
             return choice;
         }

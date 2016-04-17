@@ -7,13 +7,14 @@ using System.Threading.Tasks;
 
 namespace PudgeClient
 {
-    class RuneHashSet
+    class WorldInfo
     {
         public HashSet<Point2D> HashSet { get; private set; }
         double clearTime;
         double period;
+        public int Count { get { return HashSet.Count; } }
 
-        public RuneHashSet(double period)
+        public WorldInfo(double period)
         {
             HashSet = new HashSet<Point2D>();
             this.period = period;
@@ -42,6 +43,11 @@ namespace PudgeClient
                     HashSet = new HashSet<Point2D>();
                     clearTime = currentTime;
                 }
+        }
+
+        public double GetCooldown(double currentTime)
+        {
+            return period - (currentTime % period);
         }
     }
 }
