@@ -10,18 +10,18 @@ using System.Linq;
 namespace PudgeClient
 {
 
-    static class PudgeClientLevel2Extensions
+    static class PudgeClientLevel3Extensions
     {
         public static bool AfterHook = false;
         public static IEnumerable<Point2D> SlardarSpots = PrepareForBattle.GetSlardars();
         public static IEnumerable<Point2D> Points = PrepareForBattle.GetPoints();
         
-        public static PudgeSensorsData RotateTo(this PudgeClientLevel2 client, PudgeSensorsData data, double dx, double dy)
+        public static PudgeSensorsData RotateTo(this PudgeClientLevel3 client, PudgeSensorsData data, double dx, double dy)
         {
             var angle = Movement.FindAngle(data, dx, dy);
             return client.Rotate(angle);
         }
-        public static PudgeSensorsData GoTo(this PudgeClientLevel2 client, PudgeSensorsData data, Point2D end, WorldInfo visited, WorldInfo killed)
+        public static PudgeSensorsData GoTo(this PudgeClientLevel3 client, PudgeSensorsData data, Point2D end, WorldInfo visited, WorldInfo killed)
         {
             var old = data.SelfLocation;
             var dx = end.X - data.SelfLocation.X;
@@ -50,12 +50,12 @@ namespace PudgeClient
             return data;
         }
 
-        public static PudgeSensorsData MoveByLine(this PudgeClientLevel2 client, PudgeSensorsData data, double distance, WorldInfo visited, WorldInfo killed) 
+        public static PudgeSensorsData MoveByLine(this PudgeClientLevel3 client, PudgeSensorsData data, double distance, WorldInfo visited, WorldInfo killed) 
         {
-            var count = (int)Math.Ceiling(distance / 2);
-            var step = distance / 7;
+            var count = Math.Floor((distance / 40) * 4.5);
+            var step = distance / count;
 
-            for (var i = 0; i < 5; i++)
+            for (var i = 0; i < count; i++)
             {
                 if (data.IsDead)
                     break;
@@ -99,7 +99,7 @@ namespace PudgeClient
             return data.Map.Runes.Count != 0;
         }
 
-        public static PudgeSensorsData HookEnemy(PudgeClientLevel2 client, PudgeSensorsData data)
+        public static PudgeSensorsData HookEnemy(PudgeClientLevel3 client, PudgeSensorsData data)
         {
             var old = data.SelfLocation;
             var enemy = data.Map.Heroes.Where(x => x.Type == HeroType.Slardar).Single();
