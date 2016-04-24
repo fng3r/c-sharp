@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using AIRLab.Mathematics;
 
 namespace PudgeClient
 {
@@ -26,7 +27,7 @@ namespace PudgeClient
 
     public class PathFinder
     {
-        public static DijkstraAnswer DijkstraAlgo(Graph graph, Node start, Node end)
+        public static DijkstraAnswer DijkstraAlgo(Graph graph, Node start, Node end, List<Node> eliminated)
         {
             var notVisited = graph.Nodes.ToList();
             var track = new Dictionary<Node, DijkstraData>();
@@ -38,7 +39,7 @@ namespace PudgeClient
                 var bestPrice = double.PositiveInfinity;
                 foreach (var e in notVisited)
                 {
-                    if (track.ContainsKey(e) && track[e].Price < bestPrice)
+                    if (!eliminated.Contains(e) && track.ContainsKey(e) && track[e].Price < bestPrice)
                     {
                         bestPrice = track[e].Price;
                         toOpen = e;

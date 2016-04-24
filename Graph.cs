@@ -8,50 +8,7 @@ using System.Threading.Tasks;
 
 namespace PudgeClient
 {
-    public static class NodeExtensions
-    {
-        public static IEnumerable<Node> DepthSearch(this Node startNode)
-        {
-            var visited = new HashSet<Node>();
-            var stack = new Stack<Node>();
-            stack.Push(startNode);
-            while (stack.Count != 0)
-            {
-                var node = stack.Pop();
-                if (visited.Contains(node)) continue;
-                visited.Add(node);
-                yield return node;
-                foreach (var incidentNode in node.IncidentNodes)
-                    stack.Push(incidentNode);
-            }
-        }
-
-        public static IEnumerable<Node> BreadthSearch(this Node startNode)
-        {
-            var visited = new HashSet<Node>();
-            var queue = new Queue<Node>();
-            queue.Enqueue(startNode);
-            visited.Add(startNode);
-            while (queue.Count != 0)
-            {
-                var node = queue.Dequeue();
-                yield return node;
-                foreach (var incidentNode in node.IncidentNodes)
-                {
-                    if (visited.Contains(incidentNode))
-                    {
-                        Console.WriteLine("!");
-                    }
-                    else
-                    {
-                        visited.Add(incidentNode);
-                        queue.Enqueue(incidentNode);
-                    }
-                }
-            }
-        }
-    }
-
+        
     public class Edge
     {
         public readonly Node From;
@@ -86,6 +43,11 @@ namespace PudgeClient
         public Node(int number, Point2D p)
         {
             NodeNumber = number;
+            Location = p;
+        }
+
+        public Node(Point2D p)
+        {
             Location = p;
         }
 
@@ -165,22 +127,6 @@ namespace PudgeClient
             for (int i = 0; i < incidentNodes.Length - 1; i += 2)
                 Connect(incidentNodes[i], incidentNodes[i + 1]);
             return this;
-        }
-
-        public List<List<Node>> FindConnectedComponents()
-        {
-            var result = new List<List<Node>>();
-            var markedNodes = new HashSet<Node>();
-            while (true)
-            {
-                var nextNode = Nodes.Where(node => !markedNodes.Contains(node)).FirstOrDefault();
-                if (nextNode == null) break;
-                var breadthSearch = nextNode.BreadthSearch().ToList(); ;
-                result.Add(breadthSearch.ToList());
-                foreach (var node in breadthSearch)
-                    markedNodes.Add(node);
-            }
-            return result;
         }
     }
 }

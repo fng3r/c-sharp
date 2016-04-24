@@ -10,8 +10,9 @@ using System.Linq;
 namespace PudgeClient
 {
 
-    static class PudgeClientLevel3Extensions
+    static class PudgeClientLevel2Extensions
     {
+        static SlardarRules rules = SlardarRules.Current;
         public static bool AfterHook = false;
         public static IEnumerable<Point2D> SlardarSpots = PrepareForBattle.GetSlardars();
         public static IEnumerable<Point2D> Points = PrepareForBattle.GetPoints();
@@ -33,15 +34,10 @@ namespace PudgeClient
             {
                 if (!AfterHook && Movement.ApproximatelyEqual(old, data.SelfLocation, 2))
                 {
-                    for (int i = 0; i < 1; i++)
-                    {
                         data = client.Rotate(180);
                         data = client.MoveByLine(data, 10, visited, killed);
-                        data = client.Rotate(-90);
-                        data = client.MoveByLine(data, 7, visited, killed);
-                    }
-                    visited.Check(data.WorldTime);
-                    killed.Check(data.WorldTime);
+                        visited.Check(data.WorldTime);
+                        killed.Check(data.WorldTime);
                 }
                 AfterHook = false;
                 if (!Movement.ApproximatelyEqual(data.SelfLocation, end, 7))
@@ -91,7 +87,7 @@ namespace PudgeClient
 
         public static bool CheckEnemy(PudgeSensorsData data)
         {
-            return data.Map.Heroes.Count() != 0;
+            return data.Map.Heroes.Select(x => x.Type).Contains(HeroType.Slardar);
         }
 
         public static bool CheckRune(PudgeSensorsData data)
@@ -103,8 +99,8 @@ namespace PudgeClient
         {
             var old = data.SelfLocation;
             var enemy = data.Map.Heroes.Where(x => x.Type == HeroType.Slardar).Single();
-            var dx = enemy.Location.X - data.SelfLocation.X + Math.Cos(enemy.Angle) * 5;
-            var dy = enemy.Location.Y - data.SelfLocation.Y + Math.Sin(enemy.Angle) * 5;
+            var dx = enemy.Location.X - data.SelfLocation.X;
+            var dy = enemy.Location.Y - data.SelfLocation.Y;
             var angle = Movement.FindAngle(data, dx, dy);
             data = client.Rotate(angle);
             data = client.Hook();
