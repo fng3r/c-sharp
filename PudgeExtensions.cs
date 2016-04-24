@@ -10,7 +10,7 @@ using System.Linq;
 namespace PudgeClient
 {
 
-    static class PudgeClientLevel2Extensions
+    static class PudgeClientLevel3Extensions
     {
         static SlardarRules rules = SlardarRules.Current;
         public static bool AfterHook = false;
@@ -22,6 +22,7 @@ namespace PudgeClient
             var angle = Movement.FindAngle(data, dx, dy);
             return client.Rotate(angle);
         }
+
         public static PudgeSensorsData GoTo(this PudgeClientLevel3 client, PudgeSensorsData data, Point2D end, WorldInfo visited, WorldInfo killed)
         {
             var old = data.SelfLocation;
@@ -34,10 +35,11 @@ namespace PudgeClient
             {
                 if (!AfterHook && Movement.ApproximatelyEqual(old, data.SelfLocation, 2))
                 {
-                        data = client.Rotate(180);
-                        data = client.MoveByLine(data, 10, visited, killed);
-                        visited.Check(data.WorldTime);
-                        killed.Check(data.WorldTime);
+                    
+                    data = client.Rotate(180);
+                    data = client.MoveByLine(data, 10, visited, killed);                       
+                    visited.Check(data.WorldTime);
+                    killed.Check(data.WorldTime);
                 }
                 AfterHook = false;
                 if (!Movement.ApproximatelyEqual(data.SelfLocation, end, 7))
@@ -48,17 +50,31 @@ namespace PudgeClient
 
         public static PudgeSensorsData MoveByLine(this PudgeClientLevel3 client, PudgeSensorsData data, double distance, WorldInfo visited, WorldInfo killed) 
         {
-            var count = Math.Floor((distance / 40) * 4.5);
+            double speed;
+            if (data.Events.Select(x => x.Event).Contains(PudgeEvent.Hasted)){
+                var hasteDuration = data.Events.Select(x => x).Where(x => x.Event == PudgeEvent.Hasted).First().Duration;
+                if (hasteDuration > distance / 80)
+                    speed = 80;
+                else
+                    speed = distance / (hasteDuration + (distance - hasteDuration * 80) / 40);
+            }
+            else
+            {
+                speed = 40; 
+            }
+
+            var count = Math.Floor((distance / speed) * 4.5);
             var step = distance / count;
-            var enemy = default(HeroType);
+
             for (var i = 0; i < count; i++)
             {
                 if (data.IsDead)
                     break;
-                if (CheckEnemy(data, out enemy))
+                var check = CheckEnemy(data);
+                if (check != "")
                     if (!data.Events.Select(x => x.Event).Contains(PudgeEvent.HookCooldown))
                     {
-                        if (enemy == HeroType.Slardar)
+                        if (check == "Slardar")
                             killed.Add(SlardarSpots.Where(x => Movement.ApproximatelyEqual(data.SelfLocation, x, 100)).Single());
                         data = HookEnemy(client, data);
                         break;
@@ -86,20 +102,17 @@ namespace PudgeClient
             return data;
         }
 
-        public static bool CheckEnemy(PudgeSensorsData data, out HeroType type)
+        public static string CheckEnemy(PudgeSensorsData data)
         {
-            type = default(HeroType);
-            if (data.Map.Heroes.Count != 0)
+            if (data.Map.Heroes.Select(x => x.Type).Contains(HeroType.Pudge))
             {
-                if (data.Map.Heroes.Select(x => x.Type).Contains(HeroType.Pudge))
-                    type = HeroType.Pudge;
-                else if (data.Map.Heroes.Select(x => x.Type).Contains(HeroType.Slardar))
-                    type = HeroType.Slardar;
-                return true;
+                return "Pudge";
+            } else if (data.Map.Heroes.Select(x => x.Type).Contains(HeroType.Slardar) &&
+                !data.Events.Select(x => x.Event).Contains(PudgeEvent.Invisible))
+            {
+                return "Slardar";
             }
-            return false;
-
-
+            return "";
         }
 
         public static bool CheckRune(PudgeSensorsData data)
@@ -110,7 +123,7 @@ namespace PudgeClient
         public static PudgeSensorsData HookEnemy(PudgeClientLevel3 client, PudgeSensorsData data)
         {
             var old = data.SelfLocation;
-            var enemy = data.Map.Heroes.Where(x => x.Type == HeroType.Slardar).Single();
+            var enemy = data.Map.Heroes.Where(x => x.Type == HeroType.Slardar || x.Type == HeroType.Pudge).Single();
             var dx = enemy.Location.X - data.SelfLocation.X;
             var dy = enemy.Location.Y - data.SelfLocation.Y;
             var angle = Movement.FindAngle(data, dx, dy);

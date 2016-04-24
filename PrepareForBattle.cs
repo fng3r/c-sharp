@@ -54,24 +54,24 @@ namespace PudgeClient
                 new Point2D(0, 0),          //0
                 new Point2D(-80, -120),     //1
                 new Point2D(0, -100),       //2
-                new Point2D(65, -90),      //3
+                new Point2D(70, -90),      //3
                 new Point2D(70, -100),      //4
                 new Point2D(130, -130),     //5
                 new Point2D(90, -95),       //6
                 new Point2D(100, -70),      //7
                 new Point2D(-120, -80),     //8
                 new Point2D(-100, 0),       //9
-                new Point2D(-90, 65),       //10
+                new Point2D(-90, 70),       //10
                 new Point2D(-100, 70),      //11
                 new Point2D(-130,130),      //12
                 new Point2D(-90, 95),       //13
                 new Point2D(-70, 100),      //14
-                new Point2D(-65, 90),       //15
+                new Point2D(-70, 90),       //15
                 new Point2D(0, 100),        //16
                 new Point2D(80, 120),       //17
                 new Point2D(120, 80),       //18
                 new Point2D(100, 0),        //19
-                new Point2D(90, -65),       //20
+                new Point2D(90, -70),       //20
                 new Point2D(-130, -130),    //21
                 new Point2D(130, 130),      //22
                 new Point2D(-90, -90),      //23
