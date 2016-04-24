@@ -50,15 +50,16 @@ namespace PudgeClient
         {
             var count = Math.Floor((distance / 40) * 4.5);
             var step = distance / count;
-
+            var enemy = default(HeroType);
             for (var i = 0; i < count; i++)
             {
                 if (data.IsDead)
                     break;
-                if (CheckEnemy(data))
+                if (CheckEnemy(data, out enemy))
                     if (!data.Events.Select(x => x.Event).Contains(PudgeEvent.HookCooldown))
                     {
-                        killed.Add(SlardarSpots.Where(x => Movement.ApproximatelyEqual(data.SelfLocation, x, 100)).Single());
+                        if (enemy == HeroType.Slardar)
+                            killed.Add(SlardarSpots.Where(x => Movement.ApproximatelyEqual(data.SelfLocation, x, 100)).Single());
                         data = HookEnemy(client, data);
                         break;
                     }
@@ -85,9 +86,20 @@ namespace PudgeClient
             return data;
         }
 
-        public static bool CheckEnemy(PudgeSensorsData data)
+        public static bool CheckEnemy(PudgeSensorsData data, out HeroType type)
         {
-            return data.Map.Heroes.Select(x => x.Type).Contains(HeroType.Slardar);
+            type = default(HeroType);
+            if (data.Map.Heroes.Count != 0)
+            {
+                if (data.Map.Heroes.Select(x => x.Type).Contains(HeroType.Pudge))
+                    type = HeroType.Pudge;
+                else if (data.Map.Heroes.Select(x => x.Type).Contains(HeroType.Slardar))
+                    type = HeroType.Slardar;
+                return true;
+            }
+            return false;
+
+
         }
 
         public static bool CheckRune(PudgeSensorsData data)
